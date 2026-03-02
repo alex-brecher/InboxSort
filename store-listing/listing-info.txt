@@ -1,0 +1,43 @@
+Chrome Web Store Listing Information
+=====================================
+
+Extension Name: InboxSort
+Category: Productivity
+Language: English
+
+Primary Category: Productivity
+Secondary Category: Communication (if available)
+
+Tags/Keywords:
+- inbox sort
+- gmail sort
+- email sort
+- inbox organizer
+- gmail extension
+- email management
+- sort by sender
+- sort by date
+- group by sender
+- email filter
+- gmail productivity
+
+Screenshots Needed (1280x800 or 640x400):
+------------------------------------------
+1. screenshot-toolbar.png - The Gmail inbox with the sort toolbar visible, showing sort tabs, filter pills, search, and stats bar
+2. screenshot-popup.png - The popup menu open showing all sort options with descriptions
+3. screenshot-group-sender.png - Group by Sender mode active showing emails clustered by sender with alternating tints
+4. screenshot-filters.png - Starred and/or Unread filters active, dimming non-matching emails
+5. screenshot-dark-mode.png - The extension working in Gmail's dark mode
+
+Promotional Images:
+-------------------
+- Small tile (440x280): Tile image showing the InboxSort logo and key features
+- Large tile (920x680): Larger promotional showing the extension in action
+- Marquee (1400x560): Wide banner for featured placement
+
+Store Icon: icons/icon128.png (already generated)
+
+Privacy Policy URL: (host privacy-policy.html)
+Support URL: mailto:abrecher@gmail.com
+
+Version: 1.0.0

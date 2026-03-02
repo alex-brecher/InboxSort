@@ -1,0 +1,57 @@
+InboxSort — Sort your inbox your way
+
+Sort your Gmail inbox by date, sender, unread status, or group emails by sender — all without leaving Gmail. InboxSort adds a clean, native-feeling toolbar directly into your inbox with powerful sorting, filtering, and search capabilities.
+
+FEATURES:
+
+Sort Modes (6 options):
+• Oldest First — See your oldest emails at the top
+• Newest First — Gmail's default order (one click to restore)
+• Sender A–Z — Alphabetical by sender name
+• Sender Z–A — Reverse alphabetical order
+• Unread First — Prioritize your unread messages
+• Group by Sender — Cluster emails from the same sender together with visual grouping
+
+Quick Filters:
+• Starred — Show only starred emails
+• Unread — Show only unread messages
+• Attachments — Show only emails with attachments
+• Combine multiple filters at once
+
+Inline Search:
+• Filter visible emails by sender, subject, or snippet
+• Real-time match count as you type
+• One-click clear
+
+Stats Bar:
+• Live count of total, unread, starred, and attachment emails
+• Click any stat to toggle it as a filter
+
+Keyboard Shortcuts:
+• Alt+1 through Alt+6 for each sort mode
+• Alt+0 to reset to default
+
+Settings:
+• Auto-sort on page load
+• Remember sort preference per label
+• Snooze sorting temporarily (15m, 30m, 1h)
+• 6 accent colors to match your style
+• Settings sync across devices via your Google account
+
+WHY INBOXSORT?
+
+• Feels native to Gmail — designed to look like it belongs
+• Lightweight — uses CSS transforms, no DOM manipulation
+• Privacy first — no data leaves your browser, no tracking
+• Works on all Gmail views and labels
+• Settings sync across all your Chrome browsers
+• Dark mode support
+• Fast and responsive
+
+PERMISSIONS:
+• activeTab: Required to read and sort your email list
+• storage: Required to save and sync your sort preferences
+
+This extension does not collect, transmit, or store any personal data. All processing happens locally in your browser.
+
+Questions or feedback? Contact: abrecher@gmail.com

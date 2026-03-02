@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InboxSort — Privacy Policy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #202124;
+      line-height: 1.7;
+      padding: 0;
+    }
+    .header {
+      background: linear-gradient(135deg, #1a73e8 0%, #174ea6 100%);
+      color: #fff;
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .header p {
+      font-size: 14px;
+      opacity: 0.85;
+      margin-top: 8px;
+    }
+    .content {
+      max-width: 680px;
+      margin: -24px auto 48px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 40px 48px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a73e8;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+    h2:first-child { margin-top: 0; }
+    p { margin-bottom: 14px; font-size: 15px; color: #3c4043; }
+    ul { margin: 0 0 14px 24px; }
+    li { margin-bottom: 6px; font-size: 15px; color: #3c4043; }
+    code { background: #f1f3f4; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    a { color: #1a73e8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .effective { font-size: 13px; color: #80868b; text-align: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid #f1f3f4; }
+    @media (max-width: 720px) {
+      .content { margin: -24px 12px 48px; padding: 28px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>InboxSort — Privacy Policy</h1>
+    <p>Your privacy matters to us</p>
+  </div>
+
+  <div class="content">
+    <h2>Overview</h2>
+    <p>InboxSort is a Chrome extension that sorts and filters your Gmail inbox visually. We are committed to protecting your privacy. This policy explains what data the extension accesses and how it is handled.</p>
+
+    <h2>Data Collection</h2>
+    <p><strong>InboxSort does not collect, transmit, or store any personal data on external servers.</strong></p>
+    <p>The extension does not send any information to external servers, third-party services, or analytics platforms. There is no tracking, no telemetry, and no data sharing of any kind.</p>
+
+    <h2>What the Extension Accesses</h2>
+    <p>InboxSort accesses the following information solely within your browser:</p>
+    <ul>
+      <li><strong>Email metadata displayed on screen:</strong> Sender names, dates, subject lines, and snippets visible in your inbox list view. This data is read from the page DOM to perform sorting and filtering. It is never stored or transmitted.</li>
+      <li><strong>Your sort preferences:</strong> Settings like your chosen sort mode, accent color, and filter preferences are saved using Chrome's <code>chrome.storage.sync</code> API. This data is synced across your Chrome browsers when you are signed in with your Google account, but is never sent to any third party. Chrome handles the sync securely through your Google account.</li>
+    </ul>
+
+    <h2>Permissions Used</h2>
+    <ul>
+      <li><strong>activeTab:</strong> Required to interact with the Gmail tab when you use the extension popup. This permission is only active when you click the extension icon.</li>
+      <li><strong>storage:</strong> Required to save and sync your sort preferences (sort mode, accent color, auto-sort setting) across your Chrome browsers.</li>
+    </ul>
+
+    <h2>Data Storage</h2>
+    <p>All preferences are stored using Chrome's built-in sync storage API, which securely syncs settings across your signed-in Chrome browsers via your Google account. No data is stored on any external servers controlled by the extension developer. You can clear all extension data at any time by:</p>
+    <ul>
+      <li>Using the "Reset to Default" button in the extension popup</li>
+      <li>Removing the extension from Chrome</li>
+      <li>Clearing extension data in Chrome settings</li>
+    </ul>
+
+    <h2>Third-Party Services</h2>
+    <p>InboxSort does not use any third-party services, APIs, analytics tools, or advertising networks. The extension operates entirely within your browser.</p>
+
+    <h2>Email Content</h2>
+    <p>InboxSort reads visible email metadata (sender, date, subject) from the Gmail page for the sole purpose of sorting and filtering your inbox view. The extension does not read email bodies, does not access your Google account credentials, and does not modify any emails.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>If we make changes to this privacy policy, we will update the effective date below. We encourage you to review this policy periodically.</p>
+
+    <h2>Contact</h2>
+    <p>If you have questions about this privacy policy or the extension, please contact us at <a href="mailto:abrecher@gmail.com">abrecher@gmail.com</a>.</p>
+
+    <div class="effective">Effective date: March 2, 2026</div>
+  </div>
+</body>
+</html>

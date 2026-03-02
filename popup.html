@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      --accent: #1a73e8;
+      --accent-dark: #174ea6;
+      --accent-light: #d2e3fc;
+      width: 340px;
+      font-family: "Google Sans", Roboto, Arial, sans-serif;
+      background: #f8f9fa;
+      color: #202124;
+      overflow-x: hidden;
+      overflow-y: auto;
+      max-height: 600px;
+    }
+
+    body.dark {
+      background: #1a1a1a;
+      color: #e8eaed;
+    }
+
+    /* ── Header ──────────────────────────────── */
+
+    .header {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: #fff;
+      padding: 20px 20px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      top: -20px;
+      right: -20px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .header::after {
+      content: "";
+      position: absolute;
+      bottom: -30px;
+      right: 40px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .header-icon {
+      width: 38px;
+      height: 38px;
+      background: rgba(255,255,255,0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    .header-text h2 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .header-text p {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 2px;
+      font-weight: 400;
+    }
+
+    /* ── Card container ───────────────────────── */
+
+    .card {
+      background: #fff;
+      margin: 10px 10px 0;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+
+    body.dark .card {
+      background: #2d2d2d;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .card + .card {
+      margin-top: 6px;
+    }
+
+    .card-inner {
+      padding: 14px 16px;
+    }
+
+    .card-inner-compact {
+      padding: 10px 16px;
+    }
+
+    .card-inner-tight {
+      padding: 8px 16px;
+    }
+
+    /* ── Section label ────────────────────────── */
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5f6368;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .section-label-icon {
+      display: inline-flex;
+      opacity: 0.6;
+    }
+
+    body.dark .section-label {
+      color: #9aa0a6;
+    }
+
+    /* ── Sort options ────────────────────────── */
+
+    .sort-options {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .sort-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+      background: none;
+      width: 100%;
+      font-family: inherit;
+      font-size: 12.5px;
+      color: #3c4043;
+      text-align: left;
+      position: relative;
+    }
+
+    body.dark .sort-option {
+      color: #e8eaed;
+    }
+
+    .sort-option:hover {
+      background: #f1f3f4;
+    }
+
+    body.dark .sort-option:hover {
+      background: #3c3c3c;
+    }
+
+    .sort-option-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: #f1f3f4;
+      color: #5f6368;
+      flex-shrink: 0;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.dark .sort-option-icon {
+      background: #3c4043;
+      color: #9aa0a6;
+    }
+
+    .sort-option-label {
+      flex: 1;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    .sort-option-desc {
+      display: block;
+      font-size: 10px;
+      color: #9aa0a6;
+      font-weight: 400;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    body.dark .sort-option-desc {
+      color: #80868b;
+    }
+
+    .sort-option-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Active sort option */
+
+    .sort-option.active {
+      background: var(--accent-light);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    body.dark .sort-option.active {
+      background: rgba(138, 180, 248, 0.1);
+      color: #8ab4f8;
+    }
+
+    .sort-option.active .sort-option-icon {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    body.dark .sort-option.active .sort-option-icon {
+      background: #8ab4f8;
+      color: #202124;
+    }
+
+    .sort-option.active .sort-option-check {
+      opacity: 1;
+      transform: scale(1);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    body.dark .sort-option.active .sort-option-check {
+      background: #8ab4f8;
+      color: #202124;
+    }
+
+    .sort-option.active .sort-option-desc {
+      color: var(--accent);
+      opacity: 0.55;
+    }
+
+    body.dark .sort-option.active .sort-option-desc {
+      color: #8ab4f8;
+      opacity: 0.55;
+    }
+
+    /* ── Color picker ────────────────────────── */
+
+    .color-picker {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 0;
+    }
+
+    .color-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2.5px solid transparent;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.18);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .color-swatch.active {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 2.5px #fff, 0 0 0 5px currentColor;
+    }
+
+    body.dark .color-swatch.active {
+      box-shadow: 0 0 0 2.5px #1a1a1a, 0 0 0 5px currentColor;
+    }
+
+    .color-swatch.active::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 6.5L4.5 9.5L10 3' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+    }
+
+    /* ── Quick filter chips ──────────────────── */
+
+    .filter-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      border-radius: 18px;
+      border: 1.5px solid #dadce0;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11.5px;
+      color: #5f6368;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      white-space: nowrap;
+    }
+
+    body.dark .filter-chip {
+      border-color: #3c4043;
+      color: #9aa0a6;
+    }
+
+    .filter-chip:hover {
+      background: #f1f3f4;
+      border-color: #bdc1c6;
+    }
+
+    body.dark .filter-chip:hover {
+      background: #3c3c3c;
+      border-color: #5f6368;
+    }
+
+    .filter-chip.active {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    body.dark .filter-chip.active {
+      background: rgba(138, 180, 248, 0.1);
+      border-color: #8ab4f8;
+      color: #8ab4f8;
+    }
+
+    .filter-chip-icon {
+      display: inline-flex;
+      opacity: 0.7;
+    }
+
+    .filter-chip.active .filter-chip-icon {
+      opacity: 1;
+    }
+
+    /* ── Toggle switch ───────────────────────── */
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+    }
+
+    .toggle-row + .toggle-row {
+      border-top: 1px solid #f1f3f4;
+    }
+
+    body.dark .toggle-row + .toggle-row {
+      border-top-color: #3c4043;
+    }
+
+    .toggle-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .toggle-label {
+      font-size: 12.5px;
+      color: #3c4043;
+    }
+
+    body.dark .toggle-label {
+      color: #e8eaed;
+    }
+
+    .toggle-sublabel {
+      font-size: 9.5px;
+      color: #9aa0a6;
+      margin-top: 1px;
+    }
+
+    .toggle-switch {
+      width: 34px;
+      height: 18px;
+      background: #dadce0;
+      border-radius: 9px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      flex-shrink: 0;
+      margin-left: 10px;
+      border: none;
+      padding: 0;
+    }
+
+    body.dark .toggle-switch {
+      background: #5f6368;
+    }
+
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .toggle-switch.on {
+      background: var(--accent);
+    }
+
+    body.dark .toggle-switch.on {
+      background: #8ab4f8;
+    }
+
+    .toggle-switch.on::after {
+      transform: translateX(16px);
+    }
+
+    /* ── Snooze buttons ──────────────────────── */
+
+    .snooze-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .snooze-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 7px 6px;
+      border-radius: 8px;
+      border: 1.5px solid #dadce0;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #5f6368;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    body.dark .snooze-btn {
+      border-color: #3c4043;
+      color: #9aa0a6;
+    }
+
+    .snooze-btn:hover {
+      background: #f1f3f4;
+      border-color: #bdc1c6;
+    }
+
+    body.dark .snooze-btn:hover {
+      background: #3c3c3c;
+      border-color: #5f6368;
+    }
+
+    .snooze-status {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 12px;
+      background: #fef7e0;
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: #b06000;
+      margin-top: 6px;
+    }
+
+    body.dark .snooze-status {
+      background: rgba(176, 96, 0, 0.15);
+      color: #fdd663;
+    }
+
+    .snooze-status.visible {
+      display: flex;
+    }
+
+    .snooze-cancel {
+      background: none;
+      border: none;
+      color: inherit;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 2px 4px;
+    }
+
+    /* ── Shortcuts list ──────────────────────── */
+
+    .shortcut-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .shortcut-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 0;
+      font-size: 11.5px;
+      color: #5f6368;
+    }
+
+    body.dark .shortcut-item {
+      color: #9aa0a6;
+    }
+
+    .shortcut-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 18px;
+      padding: 0 5px;
+      background: #f1f3f4;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 9.5px;
+      font-weight: 600;
+      color: #5f6368;
+      font-family: "Google Sans", Roboto, monospace;
+      letter-spacing: 0.02em;
+    }
+
+    body.dark .shortcut-key {
+      background: #3c4043;
+      border-color: #5f6368;
+      color: #9aa0a6;
+    }
+
+    /* ── Visible Tabs — compact grid ─────────── */
+
+    .tab-vis-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px 12px;
+    }
+
+    .tab-vis-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 2px;
+      font-size: 11.5px;
+      color: #3c4043;
+      border-radius: 6px;
+    }
+
+    body.dark .tab-vis-item {
+      color: #e8eaed;
+    }
+
+    .tab-vis-name {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tab-vis-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      background: #f1f3f4;
+      color: #5f6368;
+    }
+
+    body.dark .tab-vis-icon {
+      background: #3c4043;
+      color: #9aa0a6;
+    }
+
+    .tab-vis-item.hidden .tab-vis-name {
+      opacity: 0.35;
+    }
+
+    /* Mini toggle for tab visibility */
+
+    .tab-vis-toggle {
+      width: 28px;
+      height: 14px;
+      background: #dadce0;
+      border-radius: 7px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      flex-shrink: 0;
+      border: none;
+      padding: 0;
+    }
+
+    body.dark .tab-vis-toggle {
+      background: #5f6368;
+    }
+
+    .tab-vis-toggle::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .tab-vis-toggle.on {
+      background: var(--accent);
+    }
+
+    body.dark .tab-vis-toggle.on {
+      background: #8ab4f8;
+    }
+
+    .tab-vis-toggle.on::after {
+      transform: translateX(14px);
+    }
+
+    /* ── Export / Import buttons ──────────────── */
+
+    .export-import-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .export-import-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 7px 6px;
+      border-radius: 8px;
+      border: 1.5px solid #dadce0;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #5f6368;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    body.dark .export-import-btn {
+      border-color: #3c4043;
+      color: #9aa0a6;
+    }
+
+    .export-import-btn:hover {
+      background: #f1f3f4;
+      border-color: #bdc1c6;
+      color: #3c4043;
+    }
+
+    body.dark .export-import-btn:hover {
+      background: #3c3c3c;
+      border-color: #5f6368;
+      color: #e8eaed;
+    }
+
+    .export-import-status {
+      display: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .export-import-status.success {
+      display: block;
+      background: #e6f4ea;
+      color: #137333;
+    }
+
+    body.dark .export-import-status.success {
+      background: rgba(30, 142, 62, 0.15);
+      color: #81c995;
+    }
+
+    .export-import-status.error {
+      display: block;
+      background: #fce8e6;
+      color: #d93025;
+    }
+
+    body.dark .export-import-status.error {
+      background: rgba(217, 48, 37, 0.12);
+      color: #f28b82;
+    }
+
+    /* Hidden file input for import */
+    #importFileInput {
+      display: none;
+    }
+
+    /* ── Reset button ────────────────────────── */
+
+    .reset-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 100%;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1.5px solid #dadce0;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      color: #5f6368;
+      transition: all 0.18s ease;
+    }
+
+    body.dark .reset-btn {
+      border-color: #3c4043;
+      color: #9aa0a6;
+    }
+
+    .reset-btn:hover {
+      background: #fce8e6;
+      border-color: #d93025;
+      color: #d93025;
+    }
+
+    body.dark .reset-btn:hover {
+      background: rgba(217, 48, 37, 0.12);
+      border-color: #f28b82;
+      color: #f28b82;
+    }
+
+    /* ── Collapsible section toggle ───────────── */
+
+    .collapse-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      padding: 0;
+      color: inherit;
+    }
+
+    .collapse-toggle .section-label {
+      margin-bottom: 0;
+      pointer-events: none;
+    }
+
+    .collapse-arrow {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9aa0a6;
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .collapse-toggle.open .collapse-arrow {
+      transform: rotate(180deg);
+    }
+
+    .collapse-body {
+      display: none;
+      padding-top: 8px;
+    }
+
+    .collapse-toggle.open + .collapse-body {
+      display: block;
+    }
+
+    /* ── Inline divider ──────────────────────── */
+
+    .card-divider {
+      height: 1px;
+      background: #f1f3f4;
+      margin: 6px 0;
+    }
+
+    body.dark .card-divider {
+      background: #3c4043;
+    }
+
+    /* ── Footer ──────────────────────────────── */
+
+    .footer {
+      padding: 10px 20px 14px;
+      font-size: 10px;
+      color: #bdc1c6;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    body.dark .footer {
+      color: #5f6368;
+    }
+
+    .footer-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #dadce0;
+    }
+
+    body.dark .footer-dot {
+      background: #3c4043;
+    }
+
+    .footer-link {
+      color: inherit;
+      text-decoration: none;
+      opacity: 0.7;
+      transition: opacity 0.15s ease;
+    }
+
+    .footer-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
+    /* ── Animations ──────────────────────────── */
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      animation: slideUp 0.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+
+    .card:nth-child(2) { animation-delay: 0.02s; }
+    .card:nth-child(3) { animation-delay: 0.04s; }
+    .card:nth-child(4) { animation-delay: 0.06s; }
+    .card:nth-child(5) { animation-delay: 0.08s; }
+    .card:nth-child(6) { animation-delay: 0.10s; }
+    .card:nth-child(7) { animation-delay: 0.12s; }
+    .card:nth-child(8) { animation-delay: 0.14s; }
+  </style>
+</head>
+<body>
+  <div class="header" id="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+        <rect x="2" y="5" width="20" height="14" rx="3" stroke="#fff" stroke-width="1.5"/>
+        <path d="M2 8l10 6 10-6" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+        <g transform="translate(15, 13)">
+          <path d="M0 0v5" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M-1.5 3.5L0 5.5 1.5 3.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 5.5V0.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M2.5 2L4 0 5.5 2" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+    <div class="header-text">
+      <h2>InboxSort</h2>
+      <p>Sort &bull; Filter &bull; Organize</p>
+    </div>
+  </div>
+
+  <!-- Sort Order Card -->
+  <div class="card">
+    <div class="card-inner">
+      <div class="section-label">
+        <span class="section-label-icon">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M1 3h10M1 6h7M1 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </span>
+        Sort Order
+      </div>
+      <div class="sort-options" id="sortOptions">
+        <button class="sort-option" data-sort="oldest">
+          <span class="sort-option-icon">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 13V3m-3.5 3.5L8 3l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sort-option-label">Oldest First<span class="sort-option-desc">Show oldest emails at the top</span></span>
+          <span class="sort-option-check">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6.5L4.5 9.5L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <button class="sort-option" data-sort="newest">
+          <span class="sort-option-icon">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sort-option-label">Newest First<span class="sort-option-desc">Restore Gmail's default order</span></span>
+          <span class="sort-option-check">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6.5L4.5 9.5L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <button class="sort-option" data-sort="senderAZ">
+          <span class="sort-option-icon">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M2 4h4M2 8h7M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sort-option-label">Sender A &rarr; Z<span class="sort-option-desc">Alphabetical by sender</span></span>
+          <span class="sort-option-check">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6.5L4.5 9.5L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <button class="sort-option" data-sort="senderZA">
+          <span class="sort-option-icon">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M2 4h10M2 8h7M2 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sort-option-label">Sender Z &rarr; A<span class="sort-option-desc">Reverse alphabetical</span></span>
+          <span class="sort-option-check">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6.5L4.5 9.5L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <button class="sort-option" data-sort="unreadFirst">
+          <span class="sort-option-icon">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12.5" cy="4" r="2" fill="currentColor"/></svg>
+          </span>
+          <span class="sort-option-label">Unread First<span class="sort-option-desc">Prioritize unread messages</span></span>
+          <span class="sort-option-check">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6.5L4.5 9.5L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+      </div>
+      <div style="height:6px"></div>
+      <div class="section-label" style="font-size:10px;margin-bottom:4px;">
+        <span class="section-label-icon">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg>
+        </span>
+        Group Overlay
+      </div>
+      <div class="sort-options">
+        <button class="sort-option group-toggle-option" data-action="toggleGroup" id="groupToggleBtn">
+          <span class="sort-option-icon">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg>
+          </span>
+          <span class="sort-option-label">Group by Sender<span class="sort-option-desc">Cluster emails by sender (works with any sort)</span></span>
+          <span class="sort-option-check">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6.5L4.5 9.5L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Filters + Color Picker (combined card) -->
+  <div class="card">
+    <div class="card-inner-compact">
+      <div class="section-label">
+        <span class="section-label-icon">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M1 2h10L7.5 6v3.5L4.5 11V6L1 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        </span>
+        Quick Filters
+      </div>
+      <div class="filter-chips" id="filterChips">
+        <button class="filter-chip" data-filter="starred">
+          <span class="filter-chip-icon">
+            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M7 1l1.54 3.12 3.46.5-2.5 2.44.59 3.44L7 9.17l-3.09 1.33.59-3.44L2 4.62l3.46-.5L7 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          </span>
+          Starred
+        </button>
+        <button class="filter-chip" data-filter="unread">
+          <span class="filter-chip-icon">
+            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><rect x="1.5" y="3" width="11" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 4l5.5 3.5L12.5 4" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="11" cy="3" r="2" fill="currentColor"/></svg>
+          </span>
+          Unread
+        </button>
+        <button class="filter-chip" data-filter="attachment">
+          <span class="filter-chip-icon">
+            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M12 6.5l-5 5a2.83 2.83 0 01-4-4l5-5a1.88 1.88 0 012.65 2.65L5.4 10.4a.94.94 0 01-1.33-1.33L9.15 3.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          Attachments
+        </button>
+      </div>
+      <div class="card-divider"></div>
+      <div class="section-label" style="margin-top:2px">
+        <span class="section-label-icon">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>
+        </span>
+        Accent Color
+      </div>
+      <div class="color-picker" id="colorPicker">
+        <div class="color-swatch" data-color="blue" style="background:#1a73e8; color:#1a73e8"></div>
+        <div class="color-swatch" data-color="green" style="background:#1e8e3e; color:#1e8e3e"></div>
+        <div class="color-swatch" data-color="purple" style="background:#9334e6; color:#9334e6"></div>
+        <div class="color-swatch" data-color="red" style="background:#d93025; color:#d93025"></div>
+        <div class="color-swatch" data-color="orange" style="background:#e8710a; color:#e8710a"></div>
+        <div class="color-swatch" data-color="teal" style="background:#007b83; color:#007b83"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings + Snooze (combined card) -->
+  <div class="card">
+    <div class="card-inner-compact">
+      <div class="section-label">
+        <span class="section-label-icon">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.46 2.46l1.06 1.06M8.48 8.48l1.06 1.06M9.54 2.46L8.48 3.52M3.52 8.48L2.46 9.54" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+        </span>
+        Settings
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-label">Auto-sort on load</div>
+          <div class="toggle-sublabel">Apply sort when Gmail opens</div>
+        </div>
+        <button class="toggle-switch on" id="toggleAutoSort" type="button"></button>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="toggle-label">Remember per label</div>
+          <div class="toggle-sublabel">Different sort for each label</div>
+        </div>
+        <button class="toggle-switch" id="togglePerLabel" type="button"></button>
+      </div>
+      <div class="card-divider"></div>
+      <div class="section-label" style="margin-top:2px">
+        <span class="section-label-icon">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3v3.5l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        Pause Sorting
+      </div>
+      <div class="snooze-row" id="snoozeRow">
+        <button class="snooze-btn" data-minutes="15">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.8 1.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          15m
+        </button>
+        <button class="snooze-btn" data-minutes="30">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.8 1.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          30m
+        </button>
+        <button class="snooze-btn" data-minutes="60">
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.8 1.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          1h
+        </button>
+      </div>
+      <div class="snooze-status" id="snoozeStatus">
+        <span id="snoozeStatusText">Sorting paused</span>
+        <button class="snooze-cancel" id="snoozeCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visible Tabs (collapsible) -->
+  <div class="card">
+    <div class="card-inner-compact">
+      <button class="collapse-toggle" id="toggleTabVis" type="button">
+        <div class="section-label">
+          <span class="section-label-icon">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M1 6s2-3.5 5-3.5S11 6 11 6s-2 3.5-5 3.5S1 6 1 6z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" stroke-width="1.1"/></svg>
+          </span>
+          Visible Sort Tabs
+        </div>
+        <span class="collapse-arrow">
+          <svg viewBox="0 0 12 12" width="12" height="12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="collapse-body" id="tabVisBody">
+        <div class="tab-vis-grid" id="tabVisList">
+          <div class="tab-vis-item" data-tab="oldest">
+            <span class="tab-vis-name">
+              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M8 13V3m-3.5 3.5L8 3l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              Oldest
+            </span>
+            <button class="tab-vis-toggle on" data-tab="oldest" type="button"></button>
+          </div>
+          <div class="tab-vis-item" data-tab="newest">
+            <span class="tab-vis-name">
+              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              Newest
+            </span>
+            <button class="tab-vis-toggle on" data-tab="newest" type="button"></button>
+          </div>
+          <div class="tab-vis-item" data-tab="senderAZ">
+            <span class="tab-vis-name">
+              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M2 4h4M2 8h7M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+              A &rarr; Z
+            </span>
+            <button class="tab-vis-toggle on" data-tab="senderAZ" type="button"></button>
+          </div>
+          <div class="tab-vis-item" data-tab="senderZA">
+            <span class="tab-vis-name">
+              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M2 4h10M2 8h7M2 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+              Z &rarr; A
+            </span>
+            <button class="tab-vis-toggle on" data-tab="senderZA" type="button"></button>
+          </div>
+          <div class="tab-vis-item" data-tab="unreadFirst">
+            <span class="tab-vis-name">
+              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12.5" cy="4" r="2" fill="currentColor"/></svg></span>
+              Unread
+            </span>
+            <button class="tab-vis-toggle on" data-tab="unreadFirst" type="button"></button>
+          </div>
+          <div class="tab-vis-item" data-tab="groupSender">
+            <span class="tab-vis-name">
+              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg></span>
+              Group
+            </span>
+            <button class="tab-vis-toggle on" data-tab="groupSender" type="button"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shortcuts + Backup (collapsible) -->
+  <div class="card">
+    <div class="card-inner-compact">
+      <button class="collapse-toggle" id="toggleShortcuts" type="button">
+        <div class="section-label">
+          <span class="section-label-icon">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><rect x="1" y="3" width="10" height="6" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M3 5h1M5 5h2M8 5h1M4 7h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/></svg>
+          </span>
+          Shortcuts &amp; Backup
+        </div>
+        <span class="collapse-arrow">
+          <svg viewBox="0 0 12 12" width="12" height="12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="collapse-body" id="shortcutsBody">
+        <div class="shortcut-list">
+          <div class="shortcut-item"><span>Oldest First</span><span class="shortcut-key">Alt+1</span></div>
+          <div class="shortcut-item"><span>Newest First</span><span class="shortcut-key">Alt+2</span></div>
+          <div class="shortcut-item"><span>Sender A-Z</span><span class="shortcut-key">Alt+3</span></div>
+          <div class="shortcut-item"><span>Sender Z-A</span><span class="shortcut-key">Alt+4</span></div>
+          <div class="shortcut-item"><span>Unread First</span><span class="shortcut-key">Alt+5</span></div>
+          <div class="shortcut-item"><span>Toggle Group</span><span class="shortcut-key">Alt+6</span></div>
+          <div class="shortcut-item"><span>Clear Filters</span><span class="shortcut-key">Alt+0</span></div>
+          <div class="shortcut-item"><span>Focus Search</span><span class="shortcut-key">/</span></div>
+          <div class="shortcut-item"><span>Shortcut Help</span><span class="shortcut-key">?</span></div>
+        </div>
+        <div class="card-divider" style="margin-top:8px"></div>
+        <div class="section-label" style="margin-top:6px">
+          <span class="section-label-icon">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M6 2v5M4 5l2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 8v2h8V8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          Backup &amp; Restore
+        </div>
+        <div class="export-import-row">
+          <button class="export-import-btn" id="exportBtn" type="button">
+            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M7 2v6M5 6l2 2 2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9.5v2.5h10V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Export
+          </button>
+          <button class="export-import-btn" id="importBtn" type="button">
+            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M7 8V2M5 4l2-2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9.5v2.5h10V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Import
+          </button>
+          <input type="file" id="importFileInput" accept=".json">
+        </div>
+        <div class="export-import-status" id="exportImportStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Card -->
+  <div class="card" style="margin-bottom: 2px">
+    <div class="card-inner-tight">
+      <button class="reset-btn" id="resetBtn" type="button">
+        <svg viewBox="0 0 14 14" width="12" height="12" fill="none"><path d="M2 7a5 5 0 0 1 9.33-2.5M12 7a5 5 0 0 1-9.33 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.33 2v2.5h-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.67 12v-2.5h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Reset to Default
+      </button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>InboxSort v1.0.0</span>
+    <span class="footer-dot"></span>
+    <span>made by Alex Brecher</span>
+    <span class="footer-dot"></span>
+    <a href="mailto:abrecher@gmail.com" class="footer-link">Feedback</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

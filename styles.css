@@ -1,0 +1,979 @@
+/* ================================================================
+ *  InboxSort — Stylesheet (v1.0.0) — Made by Alex Brecher
+ * ================================================================ */
+
+/* ── Accent colour defaults (set on :root, overridden by JS) ── */
+
+:root {
+  --sort-accent: #1a73e8;
+  --sort-accent-hover: #1765cc;
+  --sort-accent-light: #d2e3fc;
+}
+
+/* ── Container ─────────────────────────────────────────── */
+
+.gmail-sort-container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1px !important;
+  padding: 0 8px !important;
+  position: relative !important;
+  z-index: auto !important;
+  margin: 0 !important;
+  height: 40px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  overflow: visible !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0)) !important;
+}
+
+.gmail-sort-container.gmail-sort-hidden {
+  display: none !important;
+}
+
+/* ── Sort tabs (pill / chip design) ──────────────────── */
+
+.gmail-sort-tab {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 0 10px !important;
+  height: 28px !important;
+  box-sizing: border-box !important;
+  border: 1.5px solid transparent !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: #5f6368 !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  user-select: none !important;
+  position: relative !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  flex-shrink: 0 !important;
+}
+
+.gmail-sort-tab:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #202124 !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.gmail-sort-tab:active {
+  background: rgba(0, 0, 0, 0.08) !important;
+  transform: scale(0.97) !important;
+}
+
+.gmail-sort-tab-active {
+  background: var(--sort-accent-light) !important;
+  color: var(--sort-accent) !important;
+  border-color: var(--sort-accent) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.12) !important;
+}
+
+.gmail-sort-tab-active:hover {
+  background: var(--sort-accent-light) !important;
+  color: var(--sort-accent) !important;
+  border-color: var(--sort-accent-hover) !important;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.18) !important;
+}
+
+.gmail-sort-tab-active:active {
+  transform: scale(0.97) !important;
+}
+
+.gmail-sort-tab-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 16px !important;
+  height: 16px !important;
+  opacity: 0.45 !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.gmail-sort-tab:hover .gmail-sort-tab-icon {
+  opacity: 0.75 !important;
+}
+
+.gmail-sort-tab-active .gmail-sort-tab-icon {
+  opacity: 1 !important;
+  color: var(--sort-accent) !important;
+}
+
+.gmail-sort-tab-icon svg {
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.gmail-sort-tab-label {
+  line-height: 1 !important;
+}
+
+/* ── Divider ───────────────────────────────────────────── */
+
+.gmail-sort-divider {
+  width: 1px !important;
+  height: 18px !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+  margin: 0 6px !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  border-radius: 1px !important;
+}
+
+/* ── Search bar (always visible, fills remaining space) ── */
+
+.gmail-sort-search-wrap {
+  display: flex !important;
+  align-items: center !important;
+  height: 32px !important;
+  min-width: 100px !important;
+  flex: 1 1 100px !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1.5px solid transparent !important;
+  border-radius: 10px !important;
+  padding: 0 10px 0 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.gmail-sort-search-wrap:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.gmail-sort-search-wrap:focus-within {
+  background: #fff !important;
+  border-color: var(--sort-accent) !important;
+  box-shadow: 0 1px 6px rgba(26, 115, 232, 0.18) !important;
+}
+
+.gmail-sort-search-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  color: #9aa0a6 !important;
+  flex-shrink: 0 !important;
+  margin-right: 8px !important;
+  pointer-events: none !important;
+  transition: color 0.2s ease !important;
+}
+
+.gmail-sort-search-wrap:focus-within .gmail-sort-search-icon {
+  color: var(--sort-accent) !important;
+}
+
+.gmail-sort-search-icon svg {
+  width: 14px !important;
+  height: 14px !important;
+  display: block !important;
+}
+
+.gmail-sort-search-input {
+  all: unset !important;
+  display: block !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 30px !important;
+  border: none !important;
+  background: transparent !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 12.5px !important;
+  color: #202124 !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  line-height: 30px !important;
+  box-sizing: border-box !important;
+}
+
+.gmail-sort-search-input::placeholder {
+  color: #9aa0a6 !important;
+  opacity: 1 !important;
+}
+
+.gmail-sort-search-count {
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 10px !important;
+  color: #80868b !important;
+  margin-left: 4px !important;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.gmail-sort-search-close {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #80868b !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: all 0.15s ease !important;
+  padding: 0 !important;
+  margin-left: 4px !important;
+  flex-shrink: 0 !important;
+  visibility: hidden !important;
+  box-shadow: none !important;
+}
+
+.gmail-sort-search-input:not(:placeholder-shown) ~ .gmail-sort-search-close {
+  visibility: visible !important;
+}
+
+.gmail-sort-search-close:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #5f6368 !important;
+}
+
+/* ── Dimmed rows (search / filter) ────────────────────── */
+
+/* Only transition rows that are being actively filtered/grouped by the extension */
+tr.zA.gmail-sort-dim,
+tr.zA.gmail-sort-group-even,
+tr.zA.gmail-sort-group-start {
+  transition: opacity 0.2s ease, background-color 0.2s ease !important;
+}
+
+tr.zA.gmail-sort-dim {
+  opacity: 0.15 !important;
+  pointer-events: none !important;
+}
+
+/* ── Toast notification ────────────────────────────────── */
+
+.gmail-sort-toast {
+  position: fixed !important;
+  bottom: 28px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(10px) !important;
+  background: #323232 !important;
+  color: #fff !important;
+  padding: 10px 22px 10px 18px !important;
+  border-radius: 10px !important;
+  border-left: 3.5px solid var(--sort-accent, #1a73e8) !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  z-index: 9999999 !important;
+  opacity: 0 !important;
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  pointer-events: none !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  letter-spacing: 0.01em !important;
+  max-width: 340px !important;
+}
+
+.gmail-sort-toast-visible {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+/* ── Stats bar ────────────────────────────────────────── */
+
+.gmail-sort-stats {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1px !important;
+  padding: 0 2px !important;
+  margin: 0 !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 12px !important;
+  color: #5f6368 !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.gmail-sort-stat {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  padding: 2px 6px !important;
+  border-radius: 7px !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  font-size: 11.5px !important;
+  color: #5f6368 !important;
+}
+
+.gmail-sort-stat-num {
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  color: #202124 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.gmail-sort-stat-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+  opacity: 0.65 !important;
+  transition: opacity 0.15s ease !important;
+}
+.gmail-sort-stat-icon svg {
+  width: 12px !important;
+  height: 12px !important;
+  display: block !important;
+}
+
+.gmail-sort-stat-clickable {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  border-radius: 7px !important;
+  padding: 3px 7px !important;
+  border: 1px solid transparent !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.gmail-sort-stat-clickable:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #202124 !important;
+}
+
+.gmail-sort-stat-clickable:hover .gmail-sort-stat-icon {
+  opacity: 1 !important;
+}
+
+.gmail-sort-stat-clickable:hover .gmail-sort-stat-num {
+  color: #202124 !important;
+}
+
+.gmail-sort-stat-clickable:active {
+  transform: scale(0.97) !important;
+}
+
+.gmail-sort-stat-active {
+  background: var(--sort-accent-light) !important;
+  border-color: var(--sort-accent) !important;
+  color: var(--sort-accent) !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.1) !important;
+}
+
+.gmail-sort-stat-active .gmail-sort-stat-num {
+  color: var(--sort-accent) !important;
+}
+
+.gmail-sort-stat-active .gmail-sort-stat-icon {
+  opacity: 1 !important;
+  color: var(--sort-accent) !important;
+}
+
+.gmail-sort-stat-active:hover {
+  background: var(--sort-accent-light) !important;
+  border-color: var(--sort-accent-hover) !important;
+  color: var(--sort-accent-hover) !important;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.15) !important;
+}
+
+.gmail-sort-stat-active:hover .gmail-sort-stat-num {
+  color: var(--sort-accent-hover) !important;
+}
+
+.gmail-sort-stat-sep {
+  color: #dadce0 !important;
+  margin: 0 1px !important;
+  font-size: 8px !important;
+  line-height: 1 !important;
+  user-select: none !important;
+}
+
+.gmail-sort-snooze-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 3px 10px !important;
+  border-radius: 8px !important;
+  background: #fef7e0 !important;
+  color: #b06000 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  margin-right: 4px !important;
+  border: 1px solid rgba(176, 96, 0, 0.15) !important;
+}
+
+/* ── Group-by-sender visual clustering ────────────────── */
+
+/* Even groups get a clearly tinted background so you can visually
+   distinguish alternating sender blocks at a glance.
+   Use both background AND background-color to override Gmail's inline styles. */
+tr.zA.gmail-sort-group-even {
+  background-color: var(--sort-accent-light, #d2e3fc) !important;
+  box-shadow: inset 4px 0 0 0 var(--sort-accent, #1a73e8) !important;
+}
+tr.zA.gmail-sort-group-even > td,
+tr.zA.gmail-sort-group-even td {
+  background-color: var(--sort-accent-light, #d2e3fc) !important;
+  background: var(--sort-accent-light, #d2e3fc) !important;
+}
+
+/* Odd groups: subtle left accent bar only (no tint) so they still
+   feel "grouped" even though they keep the default white background. */
+tr.zA.gmail-sort-group-start:not(.gmail-sort-group-even),
+tr.zA[data-sort-group]:not(.gmail-sort-group-even) {
+  box-shadow: inset 4px 0 0 0 rgba(0,0,0,0.10) !important;
+}
+
+/* Group boundary: thick top divider on the first row of each group
+   (except the very first group, which doesn't need one).
+   Uses box-shadow instead of border-top to avoid layout reflow. */
+tr.zA.gmail-sort-group-start:not(.gmail-sort-group-first) {
+  box-shadow: 0 -2px 0 0 var(--sort-accent, #1a73e8),
+              inset 4px 0 0 0 rgba(0,0,0,0.10) !important;
+}
+
+/* Even group start: combine tint left-bar + top divider */
+tr.zA.gmail-sort-group-even.gmail-sort-group-start:not(.gmail-sort-group-first) {
+  box-shadow: 0 -2px 0 0 var(--sort-accent, #1a73e8),
+              inset 4px 0 0 0 var(--sort-accent, #1a73e8) !important;
+}
+
+/* First row of very first group: just the accent bar, no top divider */
+tr.zA.gmail-sort-group-start.gmail-sort-group-first {
+  box-shadow: inset 4px 0 0 0 rgba(0,0,0,0.10) !important;
+}
+tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
+  box-shadow: inset 4px 0 0 0 var(--sort-accent, #1a73e8) !important;
+}
+
+/* Sender count badge (injected by JS next to sender name) */
+.gmail-sort-group-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 20px !important;
+  height: 20px !important;
+  margin-left: 6px !important;
+  background: var(--sort-accent, #1a73e8) !important;
+  color: #fff !important;
+  padding: 0 5px !important;
+  border-radius: 10px !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  line-height: 20px !important;
+  vertical-align: middle !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* ── Dark mode ─────────────────────────────────────────── */
+
+.gmail-sort-dark.gmail-sort-container {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.03), rgba(255,255,255,0)) !important;
+}
+
+.gmail-sort-dark .gmail-sort-tab {
+  color: #9aa0a6 !important;
+}
+
+.gmail-sort-dark .gmail-sort-tab:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #e8eaed !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.gmail-sort-dark .gmail-sort-tab:active {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.gmail-sort-dark .gmail-sort-tab-active {
+  background: rgba(138, 180, 248, 0.12) !important;
+  color: #8ab4f8 !important;
+  border-color: #8ab4f8 !important;
+  box-shadow: 0 1px 3px rgba(138, 180, 248, 0.1) !important;
+}
+
+.gmail-sort-dark .gmail-sort-tab-active:hover {
+  background: rgba(138, 180, 248, 0.16) !important;
+  color: #aecbfa !important;
+  border-color: #aecbfa !important;
+  box-shadow: 0 2px 6px rgba(138, 180, 248, 0.15) !important;
+}
+
+.gmail-sort-dark .gmail-sort-tab-active .gmail-sort-tab-icon {
+  color: #8ab4f8 !important;
+}
+
+.gmail-sort-dark .gmail-sort-divider {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-wrap {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-wrap:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-wrap:focus-within {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: #8ab4f8 !important;
+  box-shadow: 0 1px 6px rgba(138, 180, 248, 0.2) !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-wrap:focus-within .gmail-sort-search-icon {
+  color: #8ab4f8 !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-icon {
+  color: #80868b !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-input {
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-input::placeholder {
+  color: #80868b !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-count {
+  color: #80868b !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-close {
+  color: #9aa0a6 !important;
+}
+
+.gmail-sort-dark .gmail-sort-search-close:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.gmail-sort-toast.gmail-sort-dark {
+  background: #e8eaed !important;
+  color: #202124 !important;
+  border-left-color: var(--sort-accent, #8ab4f8) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ── Dark mode: stats bar ─────────────────────────────── */
+
+.gmail-sort-dark .gmail-sort-stats {
+  color: #9aa0a6 !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat {
+  color: #9aa0a6 !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-num {
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-clickable:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-clickable:hover .gmail-sort-stat-num {
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-active {
+  background: rgba(138, 180, 248, 0.1) !important;
+  border-color: #8ab4f8 !important;
+  color: #8ab4f8 !important;
+  box-shadow: 0 1px 3px rgba(138, 180, 248, 0.08) !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-active .gmail-sort-stat-num {
+  color: #8ab4f8 !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-active:hover {
+  background: rgba(138, 180, 248, 0.15) !important;
+  border-color: #aecbfa !important;
+  color: #aecbfa !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-active:hover .gmail-sort-stat-num {
+  color: #aecbfa !important;
+}
+
+.gmail-sort-dark .gmail-sort-stat-sep {
+  color: #3c4043 !important;
+}
+
+.gmail-sort-dark .gmail-sort-snooze-badge {
+  background: rgba(176, 96, 0, 0.15) !important;
+  color: #fdd663 !important;
+  border-color: rgba(253, 214, 99, 0.2) !important;
+}
+
+/* ── Dark mode: group-by-sender ───────────────────────── */
+/* Uses html.gmail-sort-dark-mode (set on <html>) so table rows outside
+   the extension container can be properly styled in dark mode. */
+
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even {
+  background-color: rgba(138, 180, 248, 0.18) !important;
+  box-shadow: inset 4px 0 0 0 var(--sort-accent, #8ab4f8) !important;
+}
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even > td,
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even td {
+  background-color: rgba(138, 180, 248, 0.18) !important;
+  background: rgba(138, 180, 248, 0.18) !important;
+}
+
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start:not(.gmail-sort-group-even),
+html.gmail-sort-dark-mode tr.zA[data-sort-group]:not(.gmail-sort-group-even) {
+  box-shadow: inset 4px 0 0 0 rgba(255,255,255,0.12) !important;
+}
+
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start:not(.gmail-sort-group-first) {
+  box-shadow: 0 -2px 0 0 var(--sort-accent, #8ab4f8),
+              inset 4px 0 0 0 rgba(255,255,255,0.12) !important;
+}
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start:not(.gmail-sort-group-first) {
+  box-shadow: 0 -2px 0 0 var(--sort-accent, #8ab4f8),
+              inset 4px 0 0 0 var(--sort-accent, #8ab4f8) !important;
+}
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start.gmail-sort-group-first {
+  box-shadow: inset 4px 0 0 0 rgba(255,255,255,0.12) !important;
+}
+html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
+  box-shadow: inset 4px 0 0 0 var(--sort-accent, #8ab4f8) !important;
+}
+
+/* Dark mode badge */
+.gmail-sort-group-badge-dark {
+  background: #8ab4f8 !important;
+  color: #202124 !important;
+}
+
+/* ── Keyboard shortcut cheat sheet overlay ────────────── */
+
+.gmail-sort-cheatsheet-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  z-index: 99999998 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+  pointer-events: none !important;
+}
+
+.gmail-sort-cheatsheet-backdrop.gmail-sort-cheatsheet-visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.gmail-sort-cheatsheet {
+  background: #fff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18), 0 8px 16px rgba(0, 0, 0, 0.1) !important;
+  padding: 28px 32px 24px !important;
+  min-width: 340px !important;
+  max-width: 420px !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  transform: scale(0.92) !important;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.gmail-sort-cheatsheet-visible .gmail-sort-cheatsheet {
+  transform: scale(1) !important;
+}
+
+.gmail-sort-cheatsheet-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #202124 !important;
+  margin-bottom: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.gmail-sort-cheatsheet-subtitle {
+  font-size: 11px !important;
+  color: #80868b !important;
+  margin-bottom: 18px !important;
+}
+
+.gmail-sort-cheatsheet-section {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  color: var(--sort-accent, #1a73e8) !important;
+  margin: 14px 0 6px !important;
+}
+
+/* First section follows the subtitle — remove extra top margin */
+.gmail-sort-cheatsheet-subtitle + .gmail-sort-cheatsheet-section {
+  margin-top: 0 !important;
+}
+
+.gmail-sort-cheatsheet-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 5px 0 !important;
+  font-size: 12.5px !important;
+  color: #3c4043 !important;
+}
+
+.gmail-sort-cheatsheet-key {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 26px !important;
+  height: 22px !important;
+  padding: 0 7px !important;
+  background: #f1f3f4 !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 5px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #5f6368 !important;
+  font-family: "Google Sans", Roboto, monospace !important;
+  letter-spacing: 0.02em !important;
+  white-space: nowrap !important;
+}
+
+.gmail-sort-cheatsheet-dismiss {
+  font-size: 10.5px !important;
+  color: #9aa0a6 !important;
+  text-align: center !important;
+  margin-top: 16px !important;
+  padding-top: 12px !important;
+  border-top: 1px solid #f1f3f4 !important;
+}
+
+/* Dark mode cheat sheet */
+.gmail-sort-dark .gmail-sort-cheatsheet {
+  background: #2d2d2d !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 8px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+.gmail-sort-dark .gmail-sort-cheatsheet-title {
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-cheatsheet-subtitle {
+  color: #9aa0a6 !important;
+}
+
+.gmail-sort-dark .gmail-sort-cheatsheet-row {
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-cheatsheet-key {
+  background: #3c4043 !important;
+  border-color: #5f6368 !important;
+  color: #e8eaed !important;
+}
+
+.gmail-sort-dark .gmail-sort-cheatsheet-dismiss {
+  color: #80868b !important;
+  border-top-color: #3c4043 !important;
+}
+
+/* ── Bulk-select button in stats bar ─────────────────── */
+
+.gmail-sort-bulk-select {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 12px !important;
+  border-radius: 8px !important;
+  background: var(--sort-accent-light) !important;
+  color: var(--sort-accent) !important;
+  font-family: "Google Sans", Roboto, Arial, sans-serif !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
+  margin-left: 6px !important;
+  border: 1.5px solid var(--sort-accent) !important;
+}
+
+.gmail-sort-bulk-select:hover {
+  background: var(--sort-accent) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.2) !important;
+}
+
+.gmail-sort-bulk-select:active {
+  transform: scale(0.97) !important;
+}
+
+/* Deselect variant */
+.gmail-sort-bulk-deselect {
+  background: #fce8e6 !important;
+  color: #d93025 !important;
+  border-color: #d93025 !important;
+}
+
+.gmail-sort-bulk-deselect:hover {
+  background: #d93025 !important;
+  color: #fff !important;
+}
+
+.gmail-sort-dark .gmail-sort-bulk-select {
+  background: rgba(138, 180, 248, 0.1) !important;
+  border-color: #8ab4f8 !important;
+  color: #8ab4f8 !important;
+}
+
+.gmail-sort-dark .gmail-sort-bulk-select:hover {
+  background: #8ab4f8 !important;
+  color: #202124 !important;
+}
+
+.gmail-sort-dark .gmail-sort-bulk-deselect {
+  background: rgba(217, 48, 37, 0.12) !important;
+  border-color: #f28b82 !important;
+  color: #f28b82 !important;
+}
+
+.gmail-sort-dark .gmail-sort-bulk-deselect:hover {
+  background: #f28b82 !important;
+  color: #202124 !important;
+}
+
+/* ================================================================
+ *  Responsive Design — Graceful degradation on narrow viewports
+ * ================================================================ */
+
+/* Medium screens: hide tab labels, show icons only */
+@media (max-width: 900px) {
+  .gmail-sort-tab-label {
+    display: none !important;
+  }
+  .gmail-sort-tab {
+    padding: 0 8px !important;
+    min-width: 28px !important;
+    justify-content: center !important;
+  }
+  /* Hide stat labels, keep numbers and icons */
+  .gmail-sort-stats {
+    font-size: 0 !important;
+  }
+  .gmail-sort-stat {
+    font-size: 0 !important;
+  }
+  .gmail-sort-stat-num {
+    font-size: 11px !important;
+  }
+  .gmail-sort-stat-icon svg {
+    width: 11px !important;
+    height: 11px !important;
+  }
+  .gmail-sort-snooze-badge {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+  }
+}
+
+/* Small screens: compact everything further */
+@media (max-width: 700px) {
+  .gmail-sort-container {
+    padding: 0 4px !important;
+    gap: 0 !important;
+    height: 36px !important;
+  }
+  .gmail-sort-tab {
+    height: 24px !important;
+    padding: 0 6px !important;
+    border-radius: 6px !important;
+  }
+  .gmail-sort-tab-icon svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+  .gmail-sort-divider {
+    margin: 0 3px !important;
+    height: 14px !important;
+  }
+  .gmail-sort-search-wrap {
+    min-width: 60px !important;
+    height: 26px !important;
+    padding: 0 6px 0 8px !important;
+    border-radius: 8px !important;
+  }
+  .gmail-sort-search-input {
+    font-size: 11.5px !important;
+    height: 24px !important;
+    line-height: 24px !important;
+  }
+  .gmail-sort-search-icon svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+  .gmail-sort-stat-clickable {
+    padding: 2px 5px !important;
+  }
+  .gmail-sort-bulk-select {
+    padding: 3px 8px !important;
+    font-size: 9.5px !important;
+    border-radius: 6px !important;
+  }
+}
+
+/* Very small screens: stack stats below toolbar */
+@media (max-width: 500px) {
+  .gmail-sort-container {
+    flex-wrap: wrap !important;
+    height: auto !important;
+    padding: 4px !important;
+  }
+  .gmail-sort-search-wrap {
+    order: 10 !important;
+    flex: 1 0 100% !important;
+    margin-top: 4px !important;
+  }
+  .gmail-sort-stats {
+    order: 9 !important;
+    flex: 1 0 100% !important;
+    margin-top: 2px !important;
+    justify-content: center !important;
+  }
+  /* Hide dividers at this size to save space */
+  .gmail-sort-divider {
+    display: none !important;
+  }
+}
