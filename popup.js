@@ -1,19 +1,28 @@
 // ── Accent color definitions ──────────────────────────────────
 
-var ACCENT_COLORS = {
-  blue:   { primary: "#1a73e8", dark: "#174ea6", light: "#d2e3fc" },
-  green:  { primary: "#1e8e3e", dark: "#137333", light: "#ceead6" },
-  purple: { primary: "#9334e6", dark: "#5c16a5", light: "#e8d0fe" },
-  red:    { primary: "#d93025", dark: "#a50e0e", light: "#f4c7c3" },
-  orange: { primary: "#e8710a", dark: "#b06000", light: "#fde293" },
-  teal:   { primary: "#007b83", dark: "#005f66", light: "#b2ebf2" }
+const ACCENT_COLORS = {
+  blue:   { primary: "#1a73e8", hover: "#1765cc", dark: "#174ea6", light: "#d2e3fc" },
+  green:  { primary: "#1e8e3e", hover: "#188038", dark: "#137333", light: "#ceead6" },
+  purple: { primary: "#9334e6", hover: "#7627bb", dark: "#5c16a5", light: "#e8d0fe" },
+  red:    { primary: "#d93025", hover: "#c5221f", dark: "#a50e0e", light: "#f4c7c3" },
+  orange: { primary: "#e8710a", hover: "#d56e0c", dark: "#b06000", light: "#fde293" },
+  teal:   { primary: "#007b83", hover: "#006d75", dark: "#005f66", light: "#b2ebf2" }
+};
+
+const DARK_ACCENT_COLORS = {
+  blue:   { primary: "#8ab4f8", hover: "#aecbfa", light: "rgba(138,180,248,0.18)" },
+  green:  { primary: "#81c995", hover: "#a8dab5", light: "rgba(129,201,149,0.18)" },
+  purple: { primary: "#c58af9", hover: "#d7aefb", light: "rgba(197,138,249,0.18)" },
+  red:    { primary: "#f28b82", hover: "#f6aea9", light: "rgba(242,139,130,0.18)" },
+  orange: { primary: "#fdd663", hover: "#fde293", light: "rgba(253,214,99,0.18)" },
+  teal:   { primary: "#4ecdc4", hover: "#73d8d0", light: "rgba(78,205,196,0.18)" }
 };
 
 // ── Helper: get active Gmail tab ─────────────────────────────
 
 function getGmailTab(callback) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    var tab = tabs && tabs[0];
+    const tab = tabs && tabs[0];
     if (tab && tab.url && tab.url.indexOf("mail.google.com") !== -1) {
       callback(tab);
     } else {
@@ -26,16 +35,21 @@ function getGmailTab(callback) {
 
 function sendToContent(msg, callback) {
   getGmailTab(function (tab) {
-    if (!tab) return;
+    if (!tab) {
+      if (callback) callback(null);
+      return;
+    }
     try {
       chrome.tabs.sendMessage(tab.id, msg, function (response) {
         if (chrome.runtime.lastError) {
-          // Content script not loaded yet, ignore
+          // Content script not loaded yet — still call back with null
+          if (callback) callback(null);
+          return;
         }
         if (callback) callback(response);
       });
     } catch (e) {
-      // Tab might not have content script loaded
+      if (callback) callback(null);
     }
   });
 }
@@ -43,18 +57,25 @@ function sendToContent(msg, callback) {
 // ── Apply accent color to popup ──────────────────────────────
 
 function applyAccentColor(color) {
-  var c = ACCENT_COLORS[color] || ACCENT_COLORS.blue;
+  const c = ACCENT_COLORS[color] || ACCENT_COLORS.blue;
+  const dc = DARK_ACCENT_COLORS[color] || DARK_ACCENT_COLORS.blue;
   document.body.style.setProperty("--accent", c.primary);
+  document.body.style.setProperty("--accent-hover", c.hover);
   document.body.style.setProperty("--accent-dark", c.dark);
   document.body.style.setProperty("--accent-light", c.light);
+  document.body.style.setProperty("--accent-dm", dc.primary);
+  document.body.style.setProperty("--accent-dm-light", dc.light);
 }
 
-// ── Apply dark mode ──────────────────────────────────────────
+// ── Apply dark mode (with live listener) ─────────────────────
 
 function applyDarkMode() {
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    document.body.classList.add("dark");
-  }
+  const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+  if (!mq) return;
+  document.body.classList.toggle("dark", mq.matches);
+  mq.addEventListener("change", function (e) {
+    document.body.classList.toggle("dark", e.matches);
+  });
 }
 
 // ── Update UI to reflect current state ───────────────────────
@@ -71,30 +92,30 @@ function updatePopupState() {
     applyAccentColor(data.accentColor);
 
     // Highlight active sort option (exclude group toggle)
-    var options = document.querySelectorAll(".sort-option:not(.group-toggle-option)");
+    const options = document.querySelectorAll(".sort-option:not(.group-toggle-option)");
     options.forEach(function (opt) {
       opt.classList.toggle("active", opt.getAttribute("data-sort") === data.sortMode);
     });
 
     // Highlight group toggle independently
-    var groupBtn = document.getElementById("groupToggleBtn");
+    const groupBtn = document.getElementById("groupToggleBtn");
     if (groupBtn) {
       groupBtn.classList.toggle("active", !!data.groupEnabled);
     }
 
     // Highlight active color swatch
-    var swatches = document.querySelectorAll(".color-swatch");
+    const swatches = document.querySelectorAll(".color-swatch");
     swatches.forEach(function (swatch) {
       swatch.classList.toggle("active", swatch.getAttribute("data-color") === data.accentColor);
     });
 
     // Update toggle switches
-    var autoSortToggle = document.getElementById("toggleAutoSort");
+    const autoSortToggle = document.getElementById("toggleAutoSort");
     if (autoSortToggle) {
       autoSortToggle.classList.toggle("on", data.autoSort !== false);
     }
 
-    var perLabelToggle = document.getElementById("togglePerLabel");
+    const perLabelToggle = document.getElementById("togglePerLabel");
     if (perLabelToggle) {
       perLabelToggle.classList.toggle("on", !!data.perLabel);
     }
@@ -108,29 +129,29 @@ function queryContentState() {
     if (!state) return;
 
     // Sync filter chips
-    var chips = document.querySelectorAll(".filter-chip");
+    const chips = document.querySelectorAll(".filter-chip");
     chips.forEach(function (chip) {
-      var filter = chip.getAttribute("data-filter");
+      const filter = chip.getAttribute("data-filter");
       if (filter === "starred") chip.classList.toggle("active", !!state.filterStarred);
       else if (filter === "unread") chip.classList.toggle("active", !!state.filterUnread);
       else if (filter === "attachment") chip.classList.toggle("active", !!state.filterAttachment);
     });
 
     // Sync sort mode (content script is source of truth)
-    var options = document.querySelectorAll(".sort-option:not(.group-toggle-option)");
+    const options = document.querySelectorAll(".sort-option:not(.group-toggle-option)");
     options.forEach(function (opt) {
       opt.classList.toggle("active", opt.getAttribute("data-sort") === state.sortMode);
     });
 
     // Sync group toggle
-    var groupBtn = document.getElementById("groupToggleBtn");
+    const groupBtn = document.getElementById("groupToggleBtn");
     if (groupBtn) {
       groupBtn.classList.toggle("active", !!state.groupEnabled);
     }
 
     // Sync snooze status
-    var snoozeStatus = document.getElementById("snoozeStatus");
-    var snoozeStatusText = document.getElementById("snoozeStatusText");
+    const snoozeStatus = document.getElementById("snoozeStatus");
+    const snoozeStatusText = document.getElementById("snoozeStatusText");
     if (snoozeStatus && state.isSnoozed) {
       snoozeStatus.classList.add("visible");
       if (snoozeStatusText) {
@@ -145,13 +166,13 @@ function queryContentState() {
 // ── Sort option click handlers ───────────────────────────────
 
 document.getElementById("sortOptions").addEventListener("click", function (e) {
-  var option = e.target.closest(".sort-option");
+  const option = e.target.closest(".sort-option");
   if (!option) return;
 
   // Group toggle uses a different action path
   if (option.classList.contains("group-toggle-option")) return;
 
-  var sortMode = option.getAttribute("data-sort");
+  const sortMode = option.getAttribute("data-sort");
   if (!sortMode) return;
 
   // Save state
@@ -159,40 +180,28 @@ document.getElementById("sortOptions").addEventListener("click", function (e) {
     updatePopupState();
   });
 
-  // Send to content script, then close popup
-  sendToContent({ action: "applySort", mode: sortMode }, function () {
-    setTimeout(function () { window.close(); }, 200);
-  });
-  // Fallback close if message never gets a response
-  setTimeout(function () { window.close(); }, 800);
+  // Send to content script
+  sendToContent({ action: "applySort", mode: sortMode });
 });
 
 // ── Group toggle click handler ────────────────────────────────
 
 document.getElementById("groupToggleBtn").addEventListener("click", function () {
-  // Toggle groupEnabled in storage
-  chrome.storage.sync.get({ groupEnabled: false }, function (data) {
-    var newVal = !data.groupEnabled;
-    chrome.storage.sync.set({ groupEnabled: newVal }, function () {
-      updatePopupState();
-    });
-  });
+  // Optimistic UI toggle for instant visual feedback
+  var groupBtn = document.getElementById("groupToggleBtn");
+  if (groupBtn) groupBtn.classList.toggle("active");
 
-  // Send toggle to content script, then close popup
-  sendToContent({ action: "toggleGroup" }, function () {
-    setTimeout(function () { window.close(); }, 200);
-  });
-  // Fallback close
-  setTimeout(function () { window.close(); }, 800);
+  // Content script is sole authority — let it toggle + persist via saveState()
+  sendToContent({ action: "toggleGroup" });
 });
 
 // ── Color picker click handlers ──────────────────────────────
 
 document.getElementById("colorPicker").addEventListener("click", function (e) {
-  var swatch = e.target.closest(".color-swatch");
+  const swatch = e.target.closest(".color-swatch");
   if (!swatch) return;
 
-  var color = swatch.getAttribute("data-color");
+  const color = swatch.getAttribute("data-color");
   if (!color) return;
 
   chrome.storage.sync.set({ accentColor: color }, function () {
@@ -204,10 +213,10 @@ document.getElementById("colorPicker").addEventListener("click", function (e) {
 // ── Quick filter chip handlers ───────────────────────────────
 
 document.getElementById("filterChips").addEventListener("click", function (e) {
-  var chip = e.target.closest(".filter-chip");
+  const chip = e.target.closest(".filter-chip");
   if (!chip) return;
 
-  var filter = chip.getAttribute("data-filter");
+  const filter = chip.getAttribute("data-filter");
   if (!filter) return;
 
   // Toggle active state locally
@@ -220,17 +229,17 @@ document.getElementById("filterChips").addEventListener("click", function (e) {
 // ── Settings toggle handlers ─────────────────────────────────
 
 document.getElementById("toggleAutoSort").addEventListener("click", function () {
-  var toggle = this;
-  var isOn = toggle.classList.contains("on");
-  var newVal = !isOn;
+  const toggle = this;
+  const isOn = toggle.classList.contains("on");
+  const newVal = !isOn;
   toggle.classList.toggle("on", newVal);
   chrome.storage.sync.set({ autoSort: newVal });
 });
 
 document.getElementById("togglePerLabel").addEventListener("click", function () {
-  var toggle = this;
-  var isOn = toggle.classList.contains("on");
-  var newVal = !isOn;
+  const toggle = this;
+  const isOn = toggle.classList.contains("on");
+  const newVal = !isOn;
   toggle.classList.toggle("on", newVal);
   chrome.storage.sync.set({ perLabel: newVal });
 });
@@ -238,17 +247,17 @@ document.getElementById("togglePerLabel").addEventListener("click", function () 
 // ── Snooze handlers ──────────────────────────────────────────
 
 document.getElementById("snoozeRow").addEventListener("click", function (e) {
-  var btn = e.target.closest(".snooze-btn");
+  const btn = e.target.closest(".snooze-btn");
   if (!btn) return;
 
-  var minutes = parseInt(btn.getAttribute("data-minutes"), 10);
+  const minutes = parseInt(btn.getAttribute("data-minutes"), 10);
   if (!minutes) return;
 
   sendToContent({ action: "snoozeSort", minutes: minutes });
 
   // Show snooze status
-  var snoozeStatus = document.getElementById("snoozeStatus");
-  var snoozeStatusText = document.getElementById("snoozeStatusText");
+  const snoozeStatus = document.getElementById("snoozeStatus");
+  const snoozeStatusText = document.getElementById("snoozeStatusText");
   if (snoozeStatus) {
     snoozeStatus.classList.add("visible");
     if (snoozeStatusText) {
@@ -260,7 +269,7 @@ document.getElementById("snoozeRow").addEventListener("click", function (e) {
 document.getElementById("snoozeCancel").addEventListener("click", function () {
   sendToContent({ action: "cancelSnooze" });
 
-  var snoozeStatus = document.getElementById("snoozeStatus");
+  const snoozeStatus = document.getElementById("snoozeStatus");
   if (snoozeStatus) snoozeStatus.classList.remove("visible");
 });
 
@@ -268,12 +277,12 @@ document.getElementById("snoozeCancel").addEventListener("click", function () {
 
 function updateTabVisibility() {
   chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
-    var hidden = data.hiddenTabs || {};
-    var items = document.querySelectorAll(".tab-vis-item");
+    const hidden = data.hiddenTabs || {};
+    const items = document.querySelectorAll(".tab-vis-item");
     items.forEach(function (item) {
-      var tabId = item.getAttribute("data-tab");
-      var toggle = item.querySelector(".tab-vis-toggle");
-      var isVisible = !hidden[tabId];
+      const tabId = item.getAttribute("data-tab");
+      const toggle = item.querySelector(".tab-vis-toggle");
+      const isVisible = !hidden[tabId];
       if (toggle) toggle.classList.toggle("on", isVisible);
       item.classList.toggle("hidden", !isVisible);
     });
@@ -281,14 +290,14 @@ function updateTabVisibility() {
 }
 
 document.getElementById("tabVisList").addEventListener("click", function (e) {
-  var toggle = e.target.closest(".tab-vis-toggle");
+  const toggle = e.target.closest(".tab-vis-toggle");
   if (!toggle) return;
 
-  var tabId = toggle.getAttribute("data-tab");
+  const tabId = toggle.getAttribute("data-tab");
   if (!tabId) return;
 
   chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
-    var hidden = data.hiddenTabs || {};
+    const hidden = data.hiddenTabs || {};
     if (hidden[tabId]) {
       delete hidden[tabId];
     } else {
@@ -304,7 +313,7 @@ document.getElementById("tabVisList").addEventListener("click", function (e) {
 // ── Export / Import handlers ─────────────────────────────────
 
 function showExportImportStatus(msg, isError) {
-  var el = document.getElementById("exportImportStatus");
+  const el = document.getElementById("exportImportStatus");
   if (!el) return;
   el.textContent = msg;
   el.className = "export-import-status " + (isError ? "error" : "success");
@@ -313,16 +322,20 @@ function showExportImportStatus(msg, isError) {
 
 document.getElementById("exportBtn").addEventListener("click", function () {
   chrome.storage.sync.get(null, function (data) {
-    var json = JSON.stringify(data, null, 2);
-    var blob = new Blob([json], { type: "application/json" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "inboxsort-settings.json";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 100);
-    showExportImportStatus("Settings exported!", false);
+    try {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "inboxsort-settings.json";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 100);
+      showExportImportStatus("Settings exported!", false);
+    } catch (err) {
+      showExportImportStatus("Export failed: " + err.message, true);
+    }
   });
 });
 
@@ -331,22 +344,32 @@ document.getElementById("importBtn").addEventListener("click", function () {
 });
 
 document.getElementById("importFileInput").addEventListener("change", function (e) {
-  var file = e.target.files && e.target.files[0];
+  const file = e.target.files && e.target.files[0];
   if (!file) return;
 
-  var reader = new FileReader();
+  const reader = new FileReader();
   reader.onload = function (ev) {
     try {
-      var data = JSON.parse(ev.target.result);
+      const data = JSON.parse(ev.target.result);
       if (typeof data !== "object" || data === null || Array.isArray(data)) {
         showExportImportStatus("Invalid settings file", true);
         return;
       }
-      // Only import known keys to prevent junk
-      var validKeys = ["sortMode", "groupEnabled", "accentColor", "autoSort", "perLabel", "labelPrefs", "hiddenTabs"];
-      var importData = {};
-      validKeys.forEach(function (key) {
-        if (data.hasOwnProperty(key)) importData[key] = data[key];
+      // Only import known keys with type validation to prevent junk
+      const VALID_SCHEMA = {
+        sortMode:     function (v) { return typeof v === "string" && ["newest","oldest","senderAZ","senderZA","unreadFirst"].indexOf(v) !== -1; },
+        groupEnabled: function (v) { return typeof v === "boolean"; },
+        accentColor:  function (v) { return typeof v === "string" && ["blue","green","purple","red","orange","teal"].indexOf(v) !== -1; },
+        autoSort:     function (v) { return typeof v === "boolean"; },
+        perLabel:     function (v) { return typeof v === "boolean"; },
+        labelPrefs:   function (v) { return typeof v === "object" && v !== null && !Array.isArray(v); },
+        hiddenTabs:   function (v) { return typeof v === "object" && v !== null && !Array.isArray(v); }
+      };
+      const importData = {};
+      Object.keys(VALID_SCHEMA).forEach(function (key) {
+        if (data.hasOwnProperty(key) && VALID_SCHEMA[key](data[key])) {
+          importData[key] = data[key];
+        }
       });
       if (Object.keys(importData).length === 0) {
         showExportImportStatus("No valid settings found", true);
@@ -356,9 +379,11 @@ document.getElementById("importFileInput").addEventListener("change", function (
         updatePopupState();
         updateTabVisibility();
         showExportImportStatus("Settings imported!", false);
-        // Notify content script of changes
+        // Notify content script of all imported changes
         if (importData.accentColor) sendToContent({ action: "setAccentColor", color: importData.accentColor });
         if (importData.hiddenTabs) sendToContent({ action: "setHiddenTabs", hiddenTabs: importData.hiddenTabs });
+        if (importData.sortMode) sendToContent({ action: "applySort", mode: importData.sortMode });
+        if (importData.hasOwnProperty("groupEnabled")) sendToContent({ action: "setGroupEnabled", enabled: importData.groupEnabled });
       });
     } catch (err) {
       showExportImportStatus("Invalid JSON file", true);
@@ -392,21 +417,17 @@ document.getElementById("resetBtn").addEventListener("click", function () {
   });
 
   // Clear snooze status display
-  var snoozeStatus = document.getElementById("snoozeStatus");
+  const snoozeStatus = document.getElementById("snoozeStatus");
   if (snoozeStatus) snoozeStatus.classList.remove("visible");
 
-  // Send reset to content script, then close popup
-  sendToContent({ action: "resetDefault" }, function () {
-    setTimeout(function () { window.close(); }, 200);
-  });
-  // Fallback close
-  setTimeout(function () { window.close(); }, 800);
+  // Send reset to content script
+  sendToContent({ action: "resetDefault" });
 });
 
 // ── Collapsible section handlers ───────────────────────────────
 
 function setupCollapsible(toggleId) {
-  var toggle = document.getElementById(toggleId);
+  const toggle = document.getElementById(toggleId);
   if (!toggle) return;
   toggle.addEventListener("click", function () {
     this.classList.toggle("open");
@@ -425,10 +446,10 @@ updateTabVisibility();
 // Show a hint if not on a Gmail tab
 getGmailTab(function (tab) {
   if (!tab) {
-    var hint = document.createElement("div");
+    const hint = document.createElement("div");
     hint.style.cssText = "padding:8px 16px;background:#fef7e0;color:#b06000;font-size:11.5px;text-align:center;font-family:inherit;border-radius:0;";
     hint.textContent = "Open Gmail to use sorting features";
-    var header = document.getElementById("header");
+    const header = document.getElementById("header");
     if (header && header.nextSibling) {
       header.parentNode.insertBefore(hint, header.nextSibling);
     }

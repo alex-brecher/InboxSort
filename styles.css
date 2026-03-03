@@ -253,11 +253,11 @@
 
 /* ── Dimmed rows (search / filter) ────────────────────── */
 
-/* Only transition rows that are being actively filtered/grouped by the extension */
-tr.zA.gmail-sort-dim,
-tr.zA.gmail-sort-group-even,
-tr.zA.gmail-sort-group-start {
-  transition: opacity 0.2s ease, background-color 0.2s ease !important;
+/* Only transition dim (filter) rows — group rows must NOT transition
+   because the group-style interval re-applies background-color frequently
+   and any CSS transition on those rows causes visible flashing. */
+tr.zA.gmail-sort-dim {
+  transition: opacity 0.2s ease !important;
 }
 
 tr.zA.gmail-sort-dim {
@@ -271,7 +271,7 @@ tr.zA.gmail-sort-dim {
   position: fixed !important;
   bottom: 28px !important;
   left: 50% !important;
-  transform: translateX(-50%) translateY(10px) !important;
+  transform: translateX(-50%) translateY(20px) scale(0.96) !important;
   background: #323232 !important;
   color: #fff !important;
   padding: 10px 22px 10px 18px !important;
@@ -282,16 +282,18 @@ tr.zA.gmail-sort-dim {
   font-weight: 500 !important;
   z-index: 9999999 !important;
   opacity: 0 !important;
-  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transition: opacity 0.2s ease-out,
+              transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
   pointer-events: none !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
   letter-spacing: 0.01em !important;
   max-width: 340px !important;
+  will-change: opacity, transform !important;
 }
 
 .gmail-sort-toast-visible {
   opacity: 1 !important;
-  transform: translateX(-50%) translateY(0) !important;
+  transform: translateX(-50%) translateY(0) scale(1) !important;
 }
 
 /* ── Stats bar ────────────────────────────────────────── */
@@ -512,21 +514,21 @@ tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
 }
 
 .gmail-sort-dark .gmail-sort-tab-active {
-  background: rgba(138, 180, 248, 0.12) !important;
-  color: #8ab4f8 !important;
-  border-color: #8ab4f8 !important;
-  box-shadow: 0 1px 3px rgba(138, 180, 248, 0.1) !important;
+  background: var(--sort-accent-light) !important;
+  color: var(--sort-accent) !important;
+  border-color: var(--sort-accent) !important;
+  box-shadow: 0 1px 3px var(--sort-accent-light) !important;
 }
 
 .gmail-sort-dark .gmail-sort-tab-active:hover {
-  background: rgba(138, 180, 248, 0.16) !important;
-  color: #aecbfa !important;
-  border-color: #aecbfa !important;
-  box-shadow: 0 2px 6px rgba(138, 180, 248, 0.15) !important;
+  background: var(--sort-accent-light) !important;
+  color: var(--sort-accent-hover) !important;
+  border-color: var(--sort-accent-hover) !important;
+  box-shadow: 0 2px 6px var(--sort-accent-light) !important;
 }
 
 .gmail-sort-dark .gmail-sort-tab-active .gmail-sort-tab-icon {
-  color: #8ab4f8 !important;
+  color: var(--sort-accent) !important;
 }
 
 .gmail-sort-dark .gmail-sort-divider {
@@ -544,12 +546,12 @@ tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
 
 .gmail-sort-dark .gmail-sort-search-wrap:focus-within {
   background: rgba(255, 255, 255, 0.1) !important;
-  border-color: #8ab4f8 !important;
-  box-shadow: 0 1px 6px rgba(138, 180, 248, 0.2) !important;
+  border-color: var(--sort-accent) !important;
+  box-shadow: 0 1px 6px var(--sort-accent-light) !important;
 }
 
 .gmail-sort-dark .gmail-sort-search-wrap:focus-within .gmail-sort-search-icon {
-  color: #8ab4f8 !important;
+  color: var(--sort-accent) !important;
 }
 
 .gmail-sort-dark .gmail-sort-search-icon {
@@ -608,24 +610,24 @@ tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
 }
 
 .gmail-sort-dark .gmail-sort-stat-active {
-  background: rgba(138, 180, 248, 0.1) !important;
-  border-color: #8ab4f8 !important;
-  color: #8ab4f8 !important;
-  box-shadow: 0 1px 3px rgba(138, 180, 248, 0.08) !important;
+  background: var(--sort-accent-light) !important;
+  border-color: var(--sort-accent) !important;
+  color: var(--sort-accent) !important;
+  box-shadow: 0 1px 3px var(--sort-accent-light) !important;
 }
 
 .gmail-sort-dark .gmail-sort-stat-active .gmail-sort-stat-num {
-  color: #8ab4f8 !important;
+  color: var(--sort-accent) !important;
 }
 
 .gmail-sort-dark .gmail-sort-stat-active:hover {
-  background: rgba(138, 180, 248, 0.15) !important;
-  border-color: #aecbfa !important;
-  color: #aecbfa !important;
+  background: var(--sort-accent-light) !important;
+  border-color: var(--sort-accent-hover) !important;
+  color: var(--sort-accent-hover) !important;
 }
 
 .gmail-sort-dark .gmail-sort-stat-active:hover .gmail-sort-stat-num {
-  color: #aecbfa !important;
+  color: var(--sort-accent-hover) !important;
 }
 
 .gmail-sort-dark .gmail-sort-stat-sep {
@@ -643,13 +645,13 @@ tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
    the extension container can be properly styled in dark mode. */
 
 html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even {
-  background-color: rgba(138, 180, 248, 0.18) !important;
+  background-color: var(--sort-accent-light, rgba(138, 180, 248, 0.18)) !important;
   box-shadow: inset 4px 0 0 0 var(--sort-accent, #8ab4f8) !important;
 }
 html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even > td,
 html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even td {
-  background-color: rgba(138, 180, 248, 0.18) !important;
-  background: rgba(138, 180, 248, 0.18) !important;
+  background-color: var(--sort-accent-light, rgba(138, 180, 248, 0.18)) !important;
+  background: var(--sort-accent-light, rgba(138, 180, 248, 0.18)) !important;
 }
 
 html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start:not(.gmail-sort-group-even),
@@ -674,7 +676,7 @@ html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start.gma
 
 /* Dark mode badge */
 .gmail-sort-group-badge-dark {
-  background: #8ab4f8 !important;
+  background: var(--sort-accent, #8ab4f8) !important;
   color: #202124 !important;
 }
 
@@ -854,13 +856,13 @@ html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start.gma
 }
 
 .gmail-sort-dark .gmail-sort-bulk-select {
-  background: rgba(138, 180, 248, 0.1) !important;
-  border-color: #8ab4f8 !important;
-  color: #8ab4f8 !important;
+  background: var(--sort-accent-light, rgba(138, 180, 248, 0.1)) !important;
+  border-color: var(--sort-accent, #8ab4f8) !important;
+  color: var(--sort-accent, #8ab4f8) !important;
 }
 
 .gmail-sort-dark .gmail-sort-bulk-select:hover {
-  background: #8ab4f8 !important;
+  background: var(--sort-accent, #8ab4f8) !important;
   color: #202124 !important;
 }
 
