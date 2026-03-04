@@ -35,25 +35,113 @@ function normalizeHiddenTabs(value) {
   return value;
 }
 
+function isContextInvalidatedError(err) {
+  let msg = "";
+  try {
+    msg = String((err && err.message) || err || "");
+  } catch (_) {
+    msg = "";
+  }
+  return /extension context invalidated/i.test(msg);
+}
+
+function isRuntimeValid() {
+  try {
+    void chrome.runtime.id;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function hasRuntimeLastError() {
+  try {
+    return !!(chrome.runtime && chrome.runtime.lastError);
+  } catch (_) {
+    return true;
+  }
+}
+
+function safeStorageGet(query, callback, fallbackValue) {
+  const fallback = fallbackValue !== undefined
+    ? fallbackValue
+    : ((query && typeof query === "object") ? query : {});
+  if (!isRuntimeValid()) {
+    if (callback) callback(fallback);
+    return;
+  }
+  try {
+    chrome.storage.sync.get(query, function (data) {
+      if (hasRuntimeLastError() || !isRuntimeValid()) {
+        if (callback) callback(fallback);
+        return;
+      }
+      if (callback) callback(data || fallback);
+    });
+  } catch (e) {
+    if (!isContextInvalidatedError(e)) {
+      console.warn("[InboxSort popup] storage.get error:", e);
+    }
+    if (callback) callback(fallback);
+  }
+}
+
+function safeStorageSet(data, callback) {
+  if (!isRuntimeValid()) {
+    if (callback) callback(false);
+    return;
+  }
+  try {
+    chrome.storage.sync.set(data, function () {
+      if (hasRuntimeLastError() || !isRuntimeValid()) {
+        if (callback) callback(false);
+        return;
+      }
+      if (callback) callback(true);
+    });
+  } catch (e) {
+    if (!isContextInvalidatedError(e)) {
+      console.warn("[InboxSort popup] storage.set error:", e);
+    }
+    if (callback) callback(false);
+  }
+}
+
 // ── Helper: get active Gmail tab ─────────────────────────────
 
 function getGmailTab(callback) {
-  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    const tab = tabs && tabs[0];
-    // `tab.url` can be unavailable under `activeTab`-only permission.
-    // Use tab.id presence as the routing guard and let sendMessage
-    // determine whether a content script is actually reachable.
-    if (tab && typeof tab.id === "number") {
-      callback(tab);
-    } else {
-      callback(null);
-    }
-  });
+  if (!isRuntimeValid()) {
+    callback(null);
+    return;
+  }
+  try {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (hasRuntimeLastError() || !isRuntimeValid()) {
+        callback(null);
+        return;
+      }
+      const tab = tabs && tabs[0];
+      // `tab.url` can be unavailable under `activeTab`-only permission.
+      // Use tab.id presence as the routing guard and let sendMessage
+      // determine whether a content script is actually reachable.
+      if (tab && typeof tab.id === "number") {
+        callback(tab);
+      } else {
+        callback(null);
+      }
+    });
+  } catch (_) {
+    callback(null);
+  }
 }
 
 // ── Helper: send message to content script ───────────────────
 
 function sendToContent(msg, callback) {
+  if (!isRuntimeValid()) {
+    if (callback) callback(null);
+    return;
+  }
   getGmailTab(function (tab) {
     if (!tab) {
       if (callback) callback(null);
@@ -61,7 +149,7 @@ function sendToContent(msg, callback) {
     }
     try {
       chrome.tabs.sendMessage(tab.id, msg, function (response) {
-        if (chrome.runtime.lastError) {
+        if (hasRuntimeLastError()) {
           // Content script not loaded yet — still call back with null
           if (callback) callback(null);
           return;
@@ -101,7 +189,7 @@ function applyDarkMode() {
 // ── Update UI to reflect current state ───────────────────────
 
 function updatePopupState() {
-  chrome.storage.sync.get({
+  safeStorageGet({
     sortMode: "newest",
     groupEnabled: false,
     accentColor: "blue",
@@ -198,7 +286,7 @@ document.getElementById("sortOptions").addEventListener("click", function (e) {
   if (!sortMode) return;
 
   // Save state
-  chrome.storage.sync.set({ sortMode: sortMode }, function () {
+  safeStorageSet({ sortMode: sortMode }, function () {
     updatePopupState();
   });
 
@@ -234,7 +322,7 @@ document.getElementById("colorPicker").addEventListener("click", function (e) {
   const color = swatch.getAttribute("data-color");
   if (!color) return;
 
-  chrome.storage.sync.set({ accentColor: color }, function () {
+  safeStorageSet({ accentColor: color }, function () {
     updatePopupState();
     sendToContent({ action: "setAccentColor", color: color });
   });
@@ -270,7 +358,7 @@ document.getElementById("toggleAutoSort").addEventListener("click", function () 
   const isOn = toggle.classList.contains("on");
   const newVal = !isOn;
   toggle.classList.toggle("on", newVal);
-  chrome.storage.sync.set({ autoSort: newVal });
+  safeStorageSet({ autoSort: newVal });
 });
 
 document.getElementById("togglePerLabel").addEventListener("click", function () {
@@ -278,7 +366,7 @@ document.getElementById("togglePerLabel").addEventListener("click", function () 
   const isOn = toggle.classList.contains("on");
   const newVal = !isOn;
   toggle.classList.toggle("on", newVal);
-  chrome.storage.sync.set({ perLabel: newVal });
+  safeStorageSet({ perLabel: newVal });
 });
 
 // ── Snooze handlers ──────────────────────────────────────────
@@ -330,7 +418,7 @@ document.getElementById("snoozeCancel").addEventListener("click", function () {
 // ── Visible tabs toggle handlers ─────────────────────────────
 
 function updateTabVisibility() {
-  chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
+  safeStorageGet({ hiddenTabs: {} }, function (data) {
     const hidden = normalizeHiddenTabs(data.hiddenTabs);
     const items = document.querySelectorAll(".tab-vis-item");
     items.forEach(function (item) {
@@ -350,14 +438,14 @@ document.getElementById("tabVisList").addEventListener("click", function (e) {
   const tabId = toggle.getAttribute("data-tab");
   if (!tabId) return;
 
-  chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
+  safeStorageGet({ hiddenTabs: {} }, function (data) {
     const hidden = normalizeHiddenTabs(data.hiddenTabs);
     if (hidden[tabId]) {
       delete hidden[tabId];
     } else {
       hidden[tabId] = true;
     }
-    chrome.storage.sync.set({ hiddenTabs: hidden }, function () {
+    safeStorageSet({ hiddenTabs: hidden }, function () {
       updateTabVisibility();
       sendToContent({ action: "setHiddenTabs", hiddenTabs: hidden });
     });
@@ -375,7 +463,7 @@ function showExportImportStatus(msg, isError) {
 }
 
 document.getElementById("exportBtn").addEventListener("click", function () {
-  chrome.storage.sync.get(null, function (data) {
+  safeStorageGet(null, function (data) {
     try {
       const json = JSON.stringify(data, null, 2);
       const blob = new Blob([json], { type: "application/json" });
@@ -390,7 +478,7 @@ document.getElementById("exportBtn").addEventListener("click", function () {
     } catch (err) {
       showExportImportStatus("Export failed: " + err.message, true);
     }
-  });
+  }, {});
 });
 
 document.getElementById("importBtn").addEventListener("click", function () {
@@ -429,7 +517,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
         showExportImportStatus("No valid settings found", true);
         return;
       }
-      chrome.storage.sync.set(importData, function () {
+      safeStorageSet(importData, function () {
         updatePopupState();
         updateTabVisibility();
         showExportImportStatus("Settings imported!", false);
@@ -452,7 +540,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
 
 document.getElementById("resetBtn").addEventListener("click", function () {
   // Reset storage to defaults (newest = Gmail default order)
-  chrome.storage.sync.set({
+  safeStorageSet({
     sortMode: "newest",
     groupEnabled: false,
     accentColor: "blue",

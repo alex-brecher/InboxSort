@@ -290,12 +290,33 @@
     }
   }
 
+  function isContextInvalidatedError(err) {
+    let msg = "";
+    try {
+      msg = String((err && err.message) || err || "");
+    } catch (_) {
+      msg = "";
+    }
+    return /extension context invalidated/i.test(msg);
+  }
+
+  function hasRuntimeLastError() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.lastError);
+    } catch (_) {
+      return true;
+    }
+  }
+
   /** Call when we detect the extension context is dead. Tears down the
    *  observer and removes UI so stale scripts don't keep running. */
   function handleContextInvalidated() {
     if (_contextInvalid) return;          // already handled
     _contextInvalid = true;
-    console.warn("[InboxSort] Extension context invalidated — cleaning up.");
+    // Expected during extension reload/uninstall; keep this low-noise.
+    if (typeof console !== "undefined" && typeof console.debug === "function") {
+      console.debug("[InboxSort] Extension context invalidated — cleaning up.");
+    }
 
     // Stop timers/intervals to avoid stale loops after extension reload/uninstall.
     if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
@@ -334,17 +355,41 @@
       if (perLabelEnabled) {
         // Per-label: also save to label-specific prefs
         chrome.storage.sync.get({ labelPrefs: {} }, function (stored) {
+          if (hasRuntimeLastError() || !isExtensionContextValid()) {
+            handleContextInvalidated();
+            return;
+          }
           let prefs = stored.labelPrefs || {};
           prefs[getCurrentLabel()] = currentSort;
           data.labelPrefs = prefs;
-          chrome.storage.sync.set(data);
+          try {
+            chrome.storage.sync.set(data, function () {
+              if (hasRuntimeLastError() || !isExtensionContextValid()) {
+                handleContextInvalidated();
+              }
+            });
+          } catch (setErr) {
+            if (isContextInvalidatedError(setErr) || !isExtensionContextValid()) {
+              handleContextInvalidated();
+            } else {
+              console.warn("[InboxSort] saveState set error:", setErr);
+            }
+          }
         });
       } else {
         // Global: save sortMode + accentColor + groupEnabled
-        chrome.storage.sync.set(data);
+        chrome.storage.sync.set(data, function () {
+          if (hasRuntimeLastError() || !isExtensionContextValid()) {
+            handleContextInvalidated();
+          }
+        });
       }
     } catch (e) {
-      console.warn("[InboxSort] saveState error:", e);
+      if (isContextInvalidatedError(e) || !isExtensionContextValid()) {
+        handleContextInvalidated();
+      } else {
+        console.warn("[InboxSort] saveState error:", e);
+      }
     }
   }
 
@@ -360,6 +405,11 @@
         labelPrefs: {},
         hiddenTabs: {}
       }, function (data) {
+        if (hasRuntimeLastError() || !isExtensionContextValid()) {
+          handleContextInvalidated();
+          callback();
+          return;
+        }
         accentColor = data.accentColor || "blue";
         autoSortEnabled = data.autoSort !== false;
         perLabelEnabled = !!data.perLabel;
@@ -380,7 +430,11 @@
         callback();
       });
     } catch (e) {
-      console.warn("[InboxSort] loadState error:", e);
+      if (isContextInvalidatedError(e) || !isExtensionContextValid()) {
+        handleContextInvalidated();
+      } else {
+        console.warn("[InboxSort] loadState error:", e);
+      }
       callback();
     }
   }
@@ -412,11 +466,20 @@
     }
     try {
       chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
+        if (hasRuntimeLastError() || !isExtensionContextValid()) {
+          handleContextInvalidated();
+          if (callback) callback();
+          return;
+        }
         hiddenTabs = normalizeHiddenTabs(data.hiddenTabs);
         if (callback) callback();
       });
     } catch (e) {
-      console.warn("[InboxSort] refreshHiddenTabsFromStorage error:", e);
+      if (isContextInvalidatedError(e) || !isExtensionContextValid()) {
+        handleContextInvalidated();
+      } else {
+        console.warn("[InboxSort] refreshHiddenTabsFromStorage error:", e);
+      }
       if (callback) callback();
     }
   }
@@ -1787,14 +1850,14 @@
   // ── Button injection & visibility ─────────────────────────────────
 
   function isButtonInjected() {
-    // Must check offsetParent to detect when Gmail hides the page-view
-    // container (display:none) during pagination.  isConnected alone is
-    // insufficient because the element stays in the DOM tree.
-    return !!(container && container.isConnected && container.offsetParent !== null);
+    // Reinjection guard should only care whether our DOM node still exists.
+    // Using offsetParent here causes false negatives when Gmail temporarily
+    // hides sections (thread/compose transitions), which leads to flicker.
+    return !!(container && container.isConnected);
   }
 
   function isStatsInjected() {
-    return !!(statsBar && statsBar.isConnected && statsBar.offsetParent !== null);
+    return !!(statsBar && statsBar.isConnected);
   }
 
   function updateButtonVisibility() {
@@ -1834,6 +1897,14 @@
 
   function injectButton() {
     if (isButtonInjected()) return;
+
+    // Prevent retry-timer buildup across rapid Gmail rerenders/reinjections.
+    if (_hiddenTabsRetryTimers.length) {
+      for (let ti = 0; ti < _hiddenTabsRetryTimers.length; ti++) {
+        clearTimeout(_hiddenTabsRetryTimers[ti]);
+      }
+      _hiddenTabsRetryTimers = [];
+    }
 
     let old = document.querySelectorAll(".gmail-sort-container");
     for (let x = 0; x < old.length; x++) old[x].remove();
