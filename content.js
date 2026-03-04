@@ -67,6 +67,21 @@
     { id: "unreadFirst", label: "Unread first",            tabLabel: "Unread",  icon: "unreadFirst" }
   ];
 
+  function isKnownSortMode(mode) {
+    for (let i = 0; i < SORT_MODES.length; i++) {
+      if (SORT_MODES[i].id === mode) return true;
+    }
+    return false;
+  }
+
+  function normalizeSortMode(mode) {
+    return isKnownSortMode(mode) ? mode : "newest";
+  }
+
+  function normalizeHiddenTabs(value) {
+    return (value && typeof value === "object" && !Array.isArray(value)) ? value : {};
+  }
+
   // Tab groups: merge related sort modes into single toggle buttons.
   // "newest" (default Gmail order) is NOT in any group — it's the inactive state.
   // Click cycle: inactive → mode[0] → mode[1] → … → inactive (newest).
@@ -189,6 +204,7 @@
   // Snooze (pause sorting)
   let snoozeTimer      = null;
   let snoozedSort      = null;
+  let snoozedGroup     = false;
   let snoozeEndTime    = 0;
   let snoozeTickTimer  = null;
 
@@ -209,13 +225,44 @@
   let _lastSortedRowCount = 0;     // Row count at last sort — triggers re-sort when rows change
   let _lastSortedRowElements = null; // First few row elements for identity-change detection
   let _lastRowChangeSort  = 0;     // Timestamp of last row-change re-sort (throttle)
+  let _searchDebounce     = null;  // Search input debounce timer
+  let _hiddenTabsRetryTimers = []; // Delayed storage re-sync timers for hidden tabs
 
   // ── Current Gmail label ─────────────────────────────────────────
 
   function getCurrentLabel() {
     let hash = location.hash;
     if (!hash || hash === "#" || hash === "#inbox" || /^#inbox\/p\d+$/.test(hash)) return "inbox";
-    return hash.replace(/^#/, "").replace(/\/p\d+$/, "") || "inbox";
+
+    let cleaned = hash.replace(/^#/, "").replace(/\/p\d+$/, "");
+    if (!cleaned) return "inbox";
+
+    // In thread view hashes (e.g. inbox/<threadId>), normalize to the list label
+    // so per-label prefs don't get stored under transient thread IDs.
+    let parts = cleaned.split("/");
+    let lastPart = parts[parts.length - 1];
+    let threadLikeTail = !!(lastPart &&
+      lastPart.length >= CONFIG.THREAD_ID_MIN_LENGTH &&
+      /^[A-Za-z0-9_-]+$/.test(lastPart));
+
+    // Two-segment hashes are often list labels (e.g. label/Work). Only treat
+    // the last segment as a thread id when the path shape can actually contain
+    // a thread tail for that root.
+    let singleRootThreadLabels = {
+      inbox: true, all: true, sent: true, starred: true, important: true,
+      drafts: true, snoozed: true, spam: true, trash: true, scheduled: true,
+      chats: true
+    };
+    let canHaveThreadTail =
+      (parts.length >= 3) ||
+      (parts.length >= 2 && !!singleRootThreadLabels[parts[0]]);
+
+    if (threadLikeTail && canHaveThreadTail) {
+      parts.pop();
+    }
+
+    let normalized = parts.join("/");
+    return normalized || "inbox";
   }
 
   // Labels where the toolbar is hidden — these folders contain too many
@@ -249,6 +296,25 @@
     if (_contextInvalid) return;          // already handled
     _contextInvalid = true;
     console.warn("[InboxSort] Extension context invalidated — cleaning up.");
+
+    // Stop timers/intervals to avoid stale loops after extension reload/uninstall.
+    if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
+    if (_groupStyleInterval) { clearInterval(_groupStyleInterval); _groupStyleInterval = null; }
+    if (_observerDebounce)   { clearTimeout(_observerDebounce);    _observerDebounce = null; }
+    if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
+    if (snoozeTimer)         { clearTimeout(snoozeTimer);          snoozeTimer = null; }
+    if (snoozeTickTimer)     { clearInterval(snoozeTickTimer);     snoozeTickTimer = null; }
+    if (_initWaitInterval)   { clearInterval(_initWaitInterval);   _initWaitInterval = null; }
+    if (_initSafetyTimeout)  { clearTimeout(_initSafetyTimeout);   _initSafetyTimeout = null; }
+    if (_waitForNewPage)     { clearInterval(_waitForNewPage);     _waitForNewPage = null; }
+    if (_hiddenTabsRetryTimers.length) {
+      for (let ti = 0; ti < _hiddenTabsRetryTimers.length; ti++) {
+        clearTimeout(_hiddenTabsRetryTimers[ti]);
+      }
+      _hiddenTabsRetryTimers = [];
+    }
+    stopGroupStyleInterval();
+
     if (_observer) { _observer.disconnect(); _observer = null; }
     // Remove UI elements so users don't see a broken toolbar
     let old = document.querySelectorAll(".gmail-sort-container");
@@ -297,18 +363,20 @@
         accentColor = data.accentColor || "blue";
         autoSortEnabled = data.autoSort !== false;
         perLabelEnabled = !!data.perLabel;
-        hiddenTabs = data.hiddenTabs || {};
+        hiddenTabs = normalizeHiddenTabs(data.hiddenTabs);
         groupEnabled = !!data.groupEnabled;
+        let loadedSort = "newest";
         if (perLabelEnabled && data.labelPrefs && data.labelPrefs[getCurrentLabel()]) {
-          currentSort = data.labelPrefs[getCurrentLabel()];
+          loadedSort = data.labelPrefs[getCurrentLabel()];
         } else {
-          currentSort = data.sortMode || "newest";
+          loadedSort = data.sortMode || "newest";
         }
         // Migrate old groupSender sort mode to new group toggle
-        if (currentSort === "groupSender") {
-          currentSort = "newest";
+        if (loadedSort === "groupSender") {
+          loadedSort = "newest";
           groupEnabled = true;
         }
+        currentSort = normalizeSortMode(loadedSort);
         callback();
       });
     } catch (e) {
@@ -317,7 +385,8 @@
     }
   }
 
-  chrome.storage.onChanged.addListener(function (changes) {
+  chrome.storage.onChanged.addListener(function (changes, areaName) {
+    if (areaName !== "sync") return;
     if (_contextInvalid) return;
     if (changes.accentColor) {
       accentColor = changes.accentColor.newValue;
@@ -330,10 +399,27 @@
       perLabelEnabled = !!changes.perLabel.newValue;
     }
     if (changes.hiddenTabs) {
-      hiddenTabs = changes.hiddenTabs.newValue || {};
+      hiddenTabs = normalizeHiddenTabs(changes.hiddenTabs.newValue);
       applyHiddenTabs();
     }
   });
+
+  function refreshHiddenTabsFromStorage(callback) {
+    if (!isExtensionContextValid()) {
+      handleContextInvalidated();
+      if (callback) callback();
+      return;
+    }
+    try {
+      chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
+        hiddenTabs = normalizeHiddenTabs(data.hiddenTabs);
+        if (callback) callback();
+      });
+    } catch (e) {
+      console.warn("[InboxSort] refreshHiddenTabsFromStorage error:", e);
+      if (callback) callback();
+    }
+  }
 
   // ── Dark-mode detection ───────────────────────────────────────────
 
@@ -1123,7 +1209,7 @@
     }
 
     // Delta check — skip DOM rebuild if counts, filter state, AND selection unchanged
-    let hasSnooze = !!(snoozeTimer && snoozeEndTime > Date.now());
+    let hasSnooze = isSnoozedActive();
     let snoozeMin = hasSnooze ? Math.max(1, Math.ceil((snoozeEndTime - Date.now()) / 60000)) : 0;
     let key = [total, unreadCount, starredCount, attachCount,
                filterUnread ? 1 : 0, filterStarred ? 1 : 0, filterAttachment ? 1 : 0,
@@ -1135,7 +1221,7 @@
     let parts = [];
 
     // Snooze indicator
-    if (snoozeTimer && snoozeEndTime > Date.now()) {
+    if (hasSnooze) {
       let remaining = Math.max(1, Math.ceil((snoozeEndTime - Date.now()) / 60000));
       parts.push('<span class="gmail-sort-snooze-badge">\u23F8 ' + remaining + 'm</span>');
     }
@@ -1391,6 +1477,9 @@
 
   function refreshUI() {
     updateUI();
+    // Hidden-tab preferences can arrive asynchronously from sync storage;
+    // always enforce visibility during UI refreshes.
+    applyHiddenTabs();
     updateStats();
     applyAllFilters();
   }
@@ -1400,12 +1489,13 @@
   function applySort(mode, silent) {
     if (isNavigating) return;
     if (isExcludedLabel()) return;
+    mode = normalizeSortMode(mode);
     _suppressObserver = true;
     try {
 
     // Cancel snooze if user explicitly changes sort during snooze
-    if (!silent && snoozeTimer) {
-      cancelSnooze();
+    if (!silent && isSnoozedActive()) {
+      cancelSnooze(false);
     }
 
     clearSortTransforms();
@@ -1495,7 +1585,13 @@
 
   // ── Toggle group overlay ───────────────────────────────────────────
 
+  function isSnoozedActive() {
+    return !!(snoozeTimer && snoozeEndTime > Date.now());
+  }
+
   function toggleGroup() {
+    // Manual group changes should end snooze immediately.
+    if (isSnoozedActive()) cancelSnooze(false);
     groupEnabled = !groupEnabled;
     saveState();
     _suppressObserver = true;
@@ -1524,32 +1620,31 @@
   // ── Snooze sort ───────────────────────────────────────────────────
 
   function snoozeSort(minutes) {
+    if (!minutes || minutes <= 0) return;
     // Cancel any existing snooze
-    cancelSnooze();
+    cancelSnooze(false);
 
     snoozedSort = currentSort;
+    snoozedGroup = groupEnabled;
     snoozeEndTime = Date.now() + minutes * 60000;
 
     // Revert to default visually, but do NOT save "newest" to storage
     clearSortTransforms();
     currentSort = "newest";
+    groupEnabled = false;
     refreshUI();
     showNotification("Sorting paused for " + minutes + " min");
 
     // Set timer to restore sort
     snoozeTimer = setTimeout(function () {
-      let restore = snoozedSort;
-      cancelSnooze();
-      if (restore && restore !== "newest") {
-        applySort(restore, false);
-        showNotification("Sorting resumed");
-      }
+      cancelSnooze(true);
+      showNotification("Sorting resumed");
     }, minutes * 60000);
 
     // Tick timer to update the snooze badge periodically
     snoozeTickTimer = setInterval(function () {
       updateStats();
-      if (!snoozeTimer || snoozeEndTime <= Date.now()) {
+      if (!isSnoozedActive()) {
         clearInterval(snoozeTickTimer);
         snoozeTickTimer = null;
       }
@@ -1558,11 +1653,23 @@
     updateStats();
   }
 
-  function cancelSnooze() {
+  function cancelSnooze(restoreSortState) {
+    let hadSnooze = !!(snoozeTimer || snoozeTickTimer || snoozeEndTime || snoozedSort !== null || snoozedGroup);
+    let restoreSort = snoozedSort;
+    let restoreGroup = !!snoozedGroup;
+
     if (snoozeTimer) { clearTimeout(snoozeTimer); snoozeTimer = null; }
     if (snoozeTickTimer) { clearInterval(snoozeTickTimer); snoozeTickTimer = null; }
     snoozedSort = null;
+    snoozedGroup = false;
     snoozeEndTime = 0;
+
+    if (restoreSortState && hadSnooze) {
+      groupEnabled = restoreGroup;
+      applySort(restoreSort || "newest", true);
+      return;
+    }
+    updateStats();
   }
 
   // ── UI state updates ──────────────────────────────────────────────
@@ -1649,10 +1756,27 @@
     let hash = location.hash;
     if (hash === "" || hash === "#" || hash === "#inbox") return true;
     if (/^#inbox\/p\d+$/.test(hash)) return true;
-    let parts = hash.split("/");
+    let parts = hash.replace(/^#/, "").split("/");
     let lastPart = parts[parts.length - 1];
     if (/^p\d+$/.test(lastPart)) return true;
-    if (lastPart.length >= CONFIG.THREAD_ID_MIN_LENGTH && /^[A-Za-z0-9_-]+$/.test(lastPart)) return false;
+
+    let threadLikeTail = !!(lastPart &&
+      lastPart.length >= CONFIG.THREAD_ID_MIN_LENGTH &&
+      /^[A-Za-z0-9_-]+$/.test(lastPart));
+    if (!threadLikeTail) return true;
+
+    // Two-segment hashes like "label/Work" are often list labels, not threads.
+    // Restrict thread detection to roots that can contain direct thread tails.
+    let singleRootThreadLabels = {
+      inbox: true, all: true, sent: true, starred: true, important: true,
+      drafts: true, snoozed: true, spam: true, trash: true, scheduled: true,
+      chats: true
+    };
+    let canHaveThreadTail =
+      (parts.length >= 3) ||
+      (parts.length >= 2 && !!singleRootThreadLabels[parts[0]]);
+    if (canHaveThreadTail) return false;
+
     return true;
   }
 
@@ -1686,7 +1810,11 @@
     for (let i = 0; i < tabs.length; i++) {
       // Group toggle: check hiddenTabs.groupSender directly
       if (tabs[i].classList.contains("gmail-sort-group-toggle")) {
-        tabs[i].style.display = hiddenTabs["groupSender"] ? "none" : "";
+        if (hiddenTabs["groupSender"]) {
+          tabs[i].style.setProperty("display", "none", "important");
+        } else {
+          tabs[i].style.removeProperty("display");
+        }
         continue;
       }
       let tabGroup = tabs[i].getAttribute("data-tab-group");
@@ -1697,9 +1825,9 @@
         if (!hiddenTabs[modes[m]]) { allHidden = false; break; }
       }
       if (tabGroup && allHidden) {
-        tabs[i].style.display = "none";
+        tabs[i].style.setProperty("display", "none", "important");
       } else {
-        tabs[i].style.display = "";
+        tabs[i].style.removeProperty("display");
       }
     }
   }
@@ -1795,10 +1923,21 @@
     toolbar.parentNode.insertBefore(container, toolbar);
 
     applyAccentColor();
-    applyHiddenTabs();
-    updateUI();
-    updateButtonVisibility();
-    updateStats();
+    // Pull latest hidden-tab prefs at inject time in case storage listeners
+    // were missed during prior Gmail rerenders.
+    refreshHiddenTabsFromStorage(function () {
+      applyHiddenTabs();
+      updateUI();
+      updateButtonVisibility();
+      updateStats();
+    });
+    // Sync can lag briefly after extension reload/startup; retry a couple times.
+    _hiddenTabsRetryTimers.push(setTimeout(function () {
+      refreshHiddenTabsFromStorage(function () { applyHiddenTabs(); });
+    }, 1000));
+    _hiddenTabsRetryTimers.push(setTimeout(function () {
+      refreshHiddenTabsFromStorage(function () { applyHiddenTabs(); });
+    }, 3000));
   }
 
   function createDivider() {
@@ -1950,7 +2089,6 @@
   }, true);
 
   // Search input (bubbling phase, debounced 150ms)
-  let _searchDebounce = null;
   document.addEventListener("input", function (e) {
     if (!e.target || !e.target.classList || !e.target.classList.contains("gmail-sort-search-input")) return;
     searchQuery = e.target.value;
@@ -2074,10 +2212,25 @@
     }
     // Mutex: prevent duplicate calls from rapid MutationObserver firings
     if (_autoSortPending && !force) return;
+    // While snoozed, keep inbox in default order regardless of stored sort.
+    if (isSnoozedActive()) {
+      currentSort = "newest";
+      groupEnabled = false;
+      refreshUI();
+      return;
+    }
     _autoSortPending = true;
 
     loadState(function () {
       applyAccentColor();
+
+      if (isSnoozedActive()) {
+        currentSort = "newest";
+        groupEnabled = false;
+        _autoSortPending = false;
+        refreshUI();
+        return;
+      }
 
       // Never auto-sort on excluded labels (Sent, All Mail) — too many emails
       if (isExcludedLabel()) {
@@ -2249,7 +2402,7 @@
         // to overlap ("bunch") or shift ("jump") after Gmail removes/adds a row.
         // Throttled to at most once per 500ms to avoid rapid sequential re-sorts
         // during bulk operations (e.g. archiving 5 emails at once).
-        if (!handled && _lastSortedRowCount > 0 && (currentSort !== "newest" || groupEnabled)) {
+        if (!handled && !isSnoozedActive() && _lastSortedRowCount > 0 && (currentSort !== "newest" || groupEnabled)) {
           let rcNow = Date.now();
           if (rcNow - _lastRowChangeSort >= 500) {
             let nowRows = getVisibleEmailRows(true);
@@ -2288,8 +2441,10 @@
   chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
     if (!msg || _contextInvalid) return;
 
+    let handled = false;
     switch (msg.action) {
       case "applySort":
+        handled = true;
         if (msg.mode === "groupSender") {
           // Legacy: popup sends groupSender → toggle group overlay
           toggleGroup();
@@ -2299,10 +2454,12 @@
         break;
 
       case "toggleGroup":
+        handled = true;
         toggleGroup();
         break;
 
       case "setGroupEnabled":
+        handled = true;
         // Direct set (not toggle) — used by import to avoid toggle mismatch
         if (typeof msg.enabled === "boolean" && msg.enabled !== groupEnabled) {
           toggleGroup();
@@ -2310,7 +2467,8 @@
         break;
 
       case "resetDefault":
-        cancelSnooze();
+        handled = true;
+        cancelSnooze(false);
         clearFilters();
         groupEnabled = false;
         accentColor = "blue";
@@ -2323,6 +2481,7 @@
         break;
 
       case "setAccentColor":
+        handled = true;
         if (msg.color) {
           accentColor = msg.color;
           applyAccentColor();
@@ -2330,6 +2489,7 @@
         break;
 
       case "toggleFilter":
+        handled = true;
         if (msg.filter === "starred") filterStarred = !filterStarred;
         else if (msg.filter === "unread") filterUnread = !filterUnread;
         else if (msg.filter === "attachment") filterAttachment = !filterAttachment;
@@ -2338,23 +2498,28 @@
         break;
 
       case "snoozeSort":
-        if (msg.minutes) snoozeSort(msg.minutes);
+        handled = true;
+        if (typeof msg.minutes === "number" && msg.minutes > 0) {
+          snoozeSort(msg.minutes);
+        }
         break;
 
       case "cancelSnooze":
-        cancelSnooze();
+        handled = true;
+        cancelSnooze(true);
         showNotification("Snooze cancelled");
-        updateStats();
         break;
 
       case "setHiddenTabs":
-        if (msg.hiddenTabs) {
-          hiddenTabs = msg.hiddenTabs;
+        handled = true;
+        if (msg.hiddenTabs && typeof msg.hiddenTabs === "object" && !Array.isArray(msg.hiddenTabs)) {
+          hiddenTabs = normalizeHiddenTabs(msg.hiddenTabs);
           applyHiddenTabs();
         }
         break;
 
       case "getState":
+        let snoozed = isSnoozedActive();
         sendResponse({
           sortMode: currentSort,
           groupEnabled: groupEnabled,
@@ -2364,12 +2529,13 @@
           autoSort: autoSortEnabled,
           perLabel: perLabelEnabled,
           hiddenTabs: hiddenTabs,
-          isSnoozed: !!snoozeTimer,
-          snoozeRemaining: snoozeTimer ? Math.max(0, Math.ceil((snoozeEndTime - Date.now()) / 60000)) : 0,
+          isSnoozed: snoozed,
+          snoozeRemaining: snoozed ? Math.max(0, Math.ceil((snoozeEndTime - Date.now()) / 60000)) : 0,
           snoozedSort: snoozedSort
         });
         return true; // async response
     }
+    if (handled) sendResponse({ ok: true });
   });
 
   // ── Cleanup on page unload ──────────────────────────────────────
@@ -2384,6 +2550,12 @@
     if (_initWaitInterval)   { clearInterval(_initWaitInterval);   _initWaitInterval = null; }
     if (_initSafetyTimeout)  { clearTimeout(_initSafetyTimeout);   _initSafetyTimeout = null; }
     if (_waitForNewPage)     { clearInterval(_waitForNewPage);     _waitForNewPage = null; }
+    if (_hiddenTabsRetryTimers.length) {
+      for (let ti = 0; ti < _hiddenTabsRetryTimers.length; ti++) {
+        clearTimeout(_hiddenTabsRetryTimers[ti]);
+      }
+      _hiddenTabsRetryTimers = [];
+    }
   });
 
   // ── Initialisation ────────────────────────────────────────────────

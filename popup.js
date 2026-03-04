@@ -18,12 +18,32 @@ const DARK_ACCENT_COLORS = {
   teal:   { primary: "#4ecdc4", hover: "#73d8d0", light: "rgba(78,205,196,0.18)" }
 };
 
+const VALID_SORT_MODES = {
+  newest: true,
+  oldest: true,
+  senderAZ: true,
+  senderZA: true,
+  unreadFirst: true
+};
+
+function normalizeSortMode(mode) {
+  return VALID_SORT_MODES[mode] ? mode : "newest";
+}
+
+function normalizeHiddenTabs(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
+
 // ── Helper: get active Gmail tab ─────────────────────────────
 
 function getGmailTab(callback) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     const tab = tabs && tabs[0];
-    if (tab && tab.url && tab.url.indexOf("mail.google.com") !== -1) {
+    // `tab.url` can be unavailable under `activeTab`-only permission.
+    // Use tab.id presence as the routing guard and let sendMessage
+    // determine whether a content script is actually reachable.
+    if (tab && typeof tab.id === "number") {
       callback(tab);
     } else {
       callback(null);
@@ -88,13 +108,15 @@ function updatePopupState() {
     autoSort: true,
     perLabel: false
   }, function (data) {
+    const sortMode = normalizeSortMode(data.sortMode);
+
     // Apply accent color
     applyAccentColor(data.accentColor);
 
     // Highlight active sort option (exclude group toggle)
     const options = document.querySelectorAll(".sort-option:not(.group-toggle-option)");
     options.forEach(function (opt) {
-      opt.classList.toggle("active", opt.getAttribute("data-sort") === data.sortMode);
+      opt.classList.toggle("active", opt.getAttribute("data-sort") === sortMode);
     });
 
     // Highlight group toggle independently
@@ -192,7 +214,15 @@ document.getElementById("groupToggleBtn").addEventListener("click", function () 
   if (groupBtn) groupBtn.classList.toggle("active");
 
   // Content script is sole authority — let it toggle + persist via saveState()
-  sendToContent({ action: "toggleGroup" });
+  sendToContent({ action: "toggleGroup" }, function (response) {
+    // No Gmail tab / content script unavailable: revert optimistic UI.
+    if (response === null && groupBtn) {
+      groupBtn.classList.toggle("active");
+      return;
+    }
+    // Re-sync from live page state (authoritative).
+    queryContentState();
+  });
 });
 
 // ── Color picker click handlers ──────────────────────────────
@@ -223,7 +253,14 @@ document.getElementById("filterChips").addEventListener("click", function (e) {
   chip.classList.toggle("active");
 
   // Send to content script
-  sendToContent({ action: "toggleFilter", filter: filter });
+  sendToContent({ action: "toggleFilter", filter: filter }, function (response) {
+    // No Gmail tab / content script unavailable: revert optimistic UI.
+    if (response === null) {
+      chip.classList.toggle("active");
+      return;
+    }
+    queryContentState();
+  });
 });
 
 // ── Settings toggle handlers ─────────────────────────────────
@@ -253,9 +290,16 @@ document.getElementById("snoozeRow").addEventListener("click", function (e) {
   const minutes = parseInt(btn.getAttribute("data-minutes"), 10);
   if (!minutes) return;
 
-  sendToContent({ action: "snoozeSort", minutes: minutes });
+  sendToContent({ action: "snoozeSort", minutes: minutes }, function (response) {
+    if (response === null) {
+      const snoozeStatus = document.getElementById("snoozeStatus");
+      if (snoozeStatus) snoozeStatus.classList.remove("visible");
+      return;
+    }
+    queryContentState();
+  });
 
-  // Show snooze status
+  // Show optimistic snooze status for snappy UI
   const snoozeStatus = document.getElementById("snoozeStatus");
   const snoozeStatusText = document.getElementById("snoozeStatusText");
   if (snoozeStatus) {
@@ -267,17 +311,27 @@ document.getElementById("snoozeRow").addEventListener("click", function (e) {
 });
 
 document.getElementById("snoozeCancel").addEventListener("click", function () {
-  sendToContent({ action: "cancelSnooze" });
-
   const snoozeStatus = document.getElementById("snoozeStatus");
+  const wasVisible = !!(snoozeStatus && snoozeStatus.classList.contains("visible"));
+
+  // Optimistic hide for snappy UI
   if (snoozeStatus) snoozeStatus.classList.remove("visible");
+
+  sendToContent({ action: "cancelSnooze" }, function (response) {
+    // If no Gmail tab, restore previous visual state.
+    if (response === null) {
+      if (snoozeStatus && wasVisible) snoozeStatus.classList.add("visible");
+      return;
+    }
+    queryContentState();
+  });
 });
 
 // ── Visible tabs toggle handlers ─────────────────────────────
 
 function updateTabVisibility() {
   chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
-    const hidden = data.hiddenTabs || {};
+    const hidden = normalizeHiddenTabs(data.hiddenTabs);
     const items = document.querySelectorAll(".tab-vis-item");
     items.forEach(function (item) {
       const tabId = item.getAttribute("data-tab");
@@ -297,7 +351,7 @@ document.getElementById("tabVisList").addEventListener("click", function (e) {
   if (!tabId) return;
 
   chrome.storage.sync.get({ hiddenTabs: {} }, function (data) {
-    const hidden = data.hiddenTabs || {};
+    const hidden = normalizeHiddenTabs(data.hiddenTabs);
     if (hidden[tabId]) {
       delete hidden[tabId];
     } else {
@@ -367,7 +421,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
       };
       const importData = {};
       Object.keys(VALID_SCHEMA).forEach(function (key) {
-        if (data.hasOwnProperty(key) && VALID_SCHEMA[key](data[key])) {
+        if (Object.prototype.hasOwnProperty.call(data, key) && VALID_SCHEMA[key](data[key])) {
           importData[key] = data[key];
         }
       });
@@ -383,7 +437,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
         if (importData.accentColor) sendToContent({ action: "setAccentColor", color: importData.accentColor });
         if (importData.hiddenTabs) sendToContent({ action: "setHiddenTabs", hiddenTabs: importData.hiddenTabs });
         if (importData.sortMode) sendToContent({ action: "applySort", mode: importData.sortMode });
-        if (importData.hasOwnProperty("groupEnabled")) sendToContent({ action: "setGroupEnabled", enabled: importData.groupEnabled });
+        if (Object.prototype.hasOwnProperty.call(importData, "groupEnabled")) sendToContent({ action: "setGroupEnabled", enabled: importData.groupEnabled });
       });
     } catch (err) {
       showExportImportStatus("Invalid JSON file", true);

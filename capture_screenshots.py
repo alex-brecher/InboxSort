@@ -32,24 +32,31 @@ def capture(output_name):
     tmp_path = "/tmp/inboxsort_fullscreen.png"
     out_path = os.path.join(STORE_DIR, output_name)
 
-    # Capture full screen
-    subprocess.run(["screencapture", "-x", tmp_path], check=True)
+    try:
+        # Capture full screen
+        subprocess.run(["screencapture", "-x", tmp_path], check=True)
 
-    # Open and crop to viewport
-    img = Image.open(tmp_path)
-    viewport = img.crop((CROP_LEFT, CROP_TOP, CROP_RIGHT, CROP_BOTTOM))
+        # Open and crop to viewport
+        img = Image.open(tmp_path)
+        if CROP_LEFT < 0 or CROP_TOP < 0 or CROP_RIGHT > img.width or CROP_BOTTOM > img.height:
+            raise ValueError(
+                f"Crop bounds out of screenshot range: "
+                f"{(CROP_LEFT, CROP_TOP, CROP_RIGHT, CROP_BOTTOM)} vs image {(img.width, img.height)}"
+            )
 
-    # Resize from Retina (2560x1600) to target (1280x800)
-    final = viewport.resize((VIEWPORT_W, VIEWPORT_H), Image.LANCZOS)
+        viewport = img.crop((CROP_LEFT, CROP_TOP, CROP_RIGHT, CROP_BOTTOM))
 
-    # Ensure RGB (no alpha) and save
-    final = final.convert("RGB")
-    final.save(out_path, "PNG")
-    print(f"  ✓ {out_path} ({final.size[0]}x{final.size[1]})")
+        # Resize from Retina (2560x1600) to target (1280x800)
+        final = viewport.resize((VIEWPORT_W, VIEWPORT_H), Image.LANCZOS)
 
-    # Cleanup
-    os.remove(tmp_path)
-    return out_path
+        # Ensure RGB (no alpha) and save
+        final = final.convert("RGB")
+        final.save(out_path, "PNG")
+        print(f"  ✓ {out_path} ({final.size[0]}x{final.size[1]})")
+        return out_path
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 if __name__ == "__main__":

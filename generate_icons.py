@@ -87,18 +87,23 @@ def draw_icon_hires():
     return img
 
 
-# Generate master at 512px, then downscale
-master = draw_icon_hires()
+def generate_icons():
+    # Generate master at 512px, then downscale
+    master = draw_icon_hires()
 
-for px in [16, 48, 128]:
-    icon = master.resize((px, px), Image.LANCZOS)
-    path = os.path.join(ICON_DIR, f"icon{px}.png")
-    icon.save(path, "PNG", optimize=True)
-    print(f"  Created {path} ({px}x{px})")
+    for px in [16, 48, 128]:
+        icon = master.resize((px, px), Image.LANCZOS)
+        path = os.path.join(ICON_DIR, f"icon{px}.png")
+        icon.save(path, "PNG", optimize=True)
+        print(f"  Created {path} ({px}x{px})")
 
-# Also save 512px for store listing
-store_path = os.path.join(ICON_DIR, "icon512.png")
-master.save(store_path, "PNG", optimize=True)
-print(f"  Created {store_path} (512x512) [for store listing]")
+    # Also save 512px for store listing
+    store_path = os.path.join(ICON_DIR, "icon512.png")
+    master.save(store_path, "PNG", optimize=True)
+    print(f"  Created {store_path} (512x512) [for store listing]")
 
-print("Done!")
+    print("Done!")
+
+
+if __name__ == "__main__":
+    generate_icons()
