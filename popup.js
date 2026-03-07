@@ -121,10 +121,13 @@ function getGmailTab(callback) {
         return;
       }
       const tab = tabs && tabs[0];
-      // `tab.url` can be unavailable under `activeTab`-only permission.
-      // Use tab.id presence as the routing guard and let sendMessage
-      // determine whether a content script is actually reachable.
       if (tab && typeof tab.id === "number") {
+        // When tab.url is available (activeTab grants it on popup open),
+        // verify this is actually a Gmail tab before proceeding.
+        if (tab.url && !tab.url.startsWith("https://mail.google.com/")) {
+          callback(null);
+          return;
+        }
         callback(tab);
       } else {
         callback(null);
@@ -160,6 +163,21 @@ function sendToContent(msg, callback) {
       if (callback) callback(null);
     }
   });
+}
+
+let liveStateSyncTimer = null;
+
+function startLiveStateSync() {
+  if (liveStateSyncTimer) return;
+  liveStateSyncTimer = setInterval(function () {
+    queryContentState();
+  }, 2000);
+}
+
+function stopLiveStateSync() {
+  if (!liveStateSyncTimer) return;
+  clearInterval(liveStateSyncTimer);
+  liveStateSyncTimer = null;
 }
 
 // ── Apply accent color to popup ──────────────────────────────
@@ -291,7 +309,13 @@ document.getElementById("sortOptions").addEventListener("click", function (e) {
   });
 
   // Send to content script
-  sendToContent({ action: "applySort", mode: sortMode });
+  sendToContent({ action: "applySort", mode: sortMode }, function (response) {
+    if (response !== null) {
+      queryContentState();
+    } else {
+      updatePopupState();
+    }
+  });
 });
 
 // ── Group toggle click handler ────────────────────────────────
@@ -324,7 +348,13 @@ document.getElementById("colorPicker").addEventListener("click", function (e) {
 
   safeStorageSet({ accentColor: color }, function () {
     updatePopupState();
-    sendToContent({ action: "setAccentColor", color: color });
+    sendToContent({ action: "setAccentColor", color: color }, function (response) {
+      if (response !== null) {
+        queryContentState();
+      } else {
+        updatePopupState();
+      }
+    });
   });
 });
 
@@ -358,7 +388,9 @@ document.getElementById("toggleAutoSort").addEventListener("click", function () 
   const isOn = toggle.classList.contains("on");
   const newVal = !isOn;
   toggle.classList.toggle("on", newVal);
-  safeStorageSet({ autoSort: newVal });
+  safeStorageSet({ autoSort: newVal }, function () {
+    setTimeout(queryContentState, 80);
+  });
 });
 
 document.getElementById("togglePerLabel").addEventListener("click", function () {
@@ -366,7 +398,9 @@ document.getElementById("togglePerLabel").addEventListener("click", function () 
   const isOn = toggle.classList.contains("on");
   const newVal = !isOn;
   toggle.classList.toggle("on", newVal);
-  safeStorageSet({ perLabel: newVal });
+  safeStorageSet({ perLabel: newVal }, function () {
+    setTimeout(queryContentState, 80);
+  });
 });
 
 // ── Snooze handlers ──────────────────────────────────────────
@@ -526,6 +560,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
         if (importData.hiddenTabs) sendToContent({ action: "setHiddenTabs", hiddenTabs: importData.hiddenTabs });
         if (importData.sortMode) sendToContent({ action: "applySort", mode: importData.sortMode });
         if (Object.prototype.hasOwnProperty.call(importData, "groupEnabled")) sendToContent({ action: "setGroupEnabled", enabled: importData.groupEnabled });
+        setTimeout(queryContentState, 120);
       });
     } catch (err) {
       showExportImportStatus("Invalid JSON file", true);
@@ -563,7 +598,13 @@ document.getElementById("resetBtn").addEventListener("click", function () {
   if (snoozeStatus) snoozeStatus.classList.remove("visible");
 
   // Send reset to content script
-  sendToContent({ action: "resetDefault" });
+  sendToContent({ action: "resetDefault" }, function (response) {
+    if (response !== null) {
+      queryContentState();
+    } else {
+      updatePopupState();
+    }
+  });
 });
 
 // ── Collapsible section handlers ───────────────────────────────
@@ -601,3 +642,28 @@ getGmailTab(function (tab) {
 // Query live state from content script after a small delay
 // (allows popup to render first for snappy feel)
 setTimeout(queryContentState, 100);
+startLiveStateSync();
+
+window.addEventListener("focus", function () {
+  updatePopupState();
+  queryContentState();
+  startLiveStateSync();
+});
+
+window.addEventListener("blur", function () {
+  stopLiveStateSync();
+});
+
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "visible") {
+    updatePopupState();
+    queryContentState();
+    startLiveStateSync();
+  } else {
+    stopLiveStateSync();
+  }
+});
+
+window.addEventListener("unload", function () {
+  stopLiveStateSync();
+});

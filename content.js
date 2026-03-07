@@ -119,6 +119,12 @@
   const CONFIG = {
     // Row cache time-to-live (ms) — how long getVisibleEmailRows() reuses cached results
     ROW_CACHE_TTL: 500,
+    // Row metadata cache TTL (ms) — volatile values are refreshed in stats/filter paths
+    ROW_META_TTL: 3000,
+    // Persist state writes are debounced to avoid sync-storage quota spikes
+    SAVE_STATE_DEBOUNCE: 200,
+    SAVE_STATE_RETRY_BASE: 1000,
+    SAVE_STATE_RETRY_MAX: 10000,
 
     // Sort animation
     SORT_TRANSITION_DURATION: "0.3s",   // CSS transition duration for row transforms
@@ -227,6 +233,11 @@
   let _lastRowChangeSort  = 0;     // Timestamp of last row-change re-sort (throttle)
   let _searchDebounce     = null;  // Search input debounce timer
   let _hiddenTabsRetryTimers = []; // Delayed storage re-sync timers for hidden tabs
+  let _saveStateTimer     = null;  // Debounced storage write timer
+  let _saveStatePending   = false; // Coalesces rapid save requests
+  let _saveStateInFlight  = false; // Single in-flight sync write guard
+  let _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
+  let _sortInProgress      = false; // Reentrancy guard for applySortTransforms
 
   // ── Current Gmail label ─────────────────────────────────────────
 
@@ -308,6 +319,28 @@
     }
   }
 
+  function getRuntimeLastErrorMessage() {
+    try {
+      if (!chrome.runtime || !chrome.runtime.lastError) return "";
+      return String(chrome.runtime.lastError.message || chrome.runtime.lastError || "");
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function isStorageQuotaError(msg) {
+    return /quota|max_write_operations|write operations/i.test(String(msg || ""));
+  }
+
+  function clearAccentColorVars() {
+    let root = document.documentElement && document.documentElement.style;
+    if (!root) return;
+    root.removeProperty("--sort-accent");
+    root.removeProperty("--sort-accent-hover");
+    root.removeProperty("--sort-accent-light");
+    document.documentElement.classList.remove("gmail-sort-dark-mode");
+  }
+
   /** Call when we detect the extension context is dead. Tears down the
    *  observer and removes UI so stale scripts don't keep running. */
   function handleContextInvalidated() {
@@ -328,6 +361,10 @@
     if (_initWaitInterval)   { clearInterval(_initWaitInterval);   _initWaitInterval = null; }
     if (_initSafetyTimeout)  { clearTimeout(_initSafetyTimeout);   _initSafetyTimeout = null; }
     if (_waitForNewPage)     { clearInterval(_waitForNewPage);     _waitForNewPage = null; }
+    if (_saveStateTimer)     { clearTimeout(_saveStateTimer);      _saveStateTimer = null; }
+    _saveStatePending = false;
+    _saveStateInFlight = false;
+    _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
     if (_hiddenTabsRetryTimers.length) {
       for (let ti = 0; ti < _hiddenTabsRetryTimers.length; ti++) {
         clearTimeout(_hiddenTabsRetryTimers[ti]);
@@ -337,6 +374,10 @@
     stopGroupStyleInterval();
 
     if (_observer) { _observer.disconnect(); _observer = null; }
+    document.removeEventListener("click", onDocumentClick, true);
+    document.removeEventListener("mousedown", onDocumentMousedown, true);
+    document.removeEventListener("input", onDocumentInput, false);
+    document.removeEventListener("keydown", onDocumentKeydown, true);
     // Remove UI elements so users don't see a broken toolbar
     let old = document.querySelectorAll(".gmail-sort-container");
     for (let i = 0; i < old.length; i++) old[i].remove();
@@ -344,53 +385,130 @@
     for (let i = 0; i < oldStats.length; i++) oldStats[i].remove();
     container = null;
     statsBar = null;
+    clearAccentColorVars();
   }
 
   // ── Persistence (chrome.storage.sync — syncs across devices) ─────
 
-  function saveState() {
-    if (!isExtensionContextValid()) { handleContextInvalidated(); return; }
+  function scheduleSaveState(delay) {
+    if (_contextInvalid) return;
+    if (_saveStateTimer) clearTimeout(_saveStateTimer);
+    _saveStateTimer = setTimeout(flushSaveState, Math.max(0, delay || 0));
+  }
+
+  function finishSaveState(retry) {
+    _saveStateInFlight = false;
+    if (_contextInvalid) return;
+    if (retry) {
+      _saveStatePending = true;
+      scheduleSaveState(_saveStateRetryDelay);
+      _saveStateRetryDelay = Math.min(CONFIG.SAVE_STATE_RETRY_MAX, _saveStateRetryDelay * 2);
+      return;
+    }
+    _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
+    if (_saveStatePending) {
+      scheduleSaveState(CONFIG.SAVE_STATE_DEBOUNCE);
+    }
+  }
+
+  function persistStateSnapshot(data) {
     try {
-      let data = { accentColor: accentColor, sortMode: currentSort, groupEnabled: groupEnabled };
-      if (perLabelEnabled) {
-        // Per-label: also save to label-specific prefs
-        chrome.storage.sync.get({ labelPrefs: {} }, function (stored) {
-          if (hasRuntimeLastError() || !isExtensionContextValid()) {
+      chrome.storage.sync.set(data, function () {
+        if (!isExtensionContextValid()) {
+          handleContextInvalidated();
+          return;
+        }
+        if (hasRuntimeLastError()) {
+          let errMsg = getRuntimeLastErrorMessage();
+          if (isContextInvalidatedError(errMsg)) {
             handleContextInvalidated();
             return;
           }
-          let prefs = stored.labelPrefs || {};
+          if (isStorageQuotaError(errMsg)) {
+            finishSaveState(true);
+            return;
+          }
+          console.warn("[InboxSort] saveState set runtime error:", errMsg);
+        }
+        finishSaveState(false);
+      });
+    } catch (setErr) {
+      if (isContextInvalidatedError(setErr) || !isExtensionContextValid()) {
+        handleContextInvalidated();
+        return;
+      }
+      if (isStorageQuotaError(String(setErr && setErr.message || setErr || ""))) {
+        finishSaveState(true);
+        return;
+      }
+      console.warn("[InboxSort] saveState set error:", setErr);
+      finishSaveState(false);
+    }
+  }
+
+  function flushSaveState() {
+    _saveStateTimer = null;
+    if (!isExtensionContextValid()) { handleContextInvalidated(); return; }
+    if (_saveStateInFlight) {
+      _saveStatePending = true;
+      return;
+    }
+    if (!_saveStatePending) return;
+
+    _saveStatePending = false;
+    _saveStateInFlight = true;
+    let data = { accentColor: accentColor, sortMode: currentSort, groupEnabled: groupEnabled };
+
+    if (perLabelEnabled) {
+      // Per-label prefs need a read-modify-write pass.
+      try {
+        chrome.storage.sync.get({ labelPrefs: {} }, function (stored) {
+          if (!isExtensionContextValid()) {
+            handleContextInvalidated();
+            return;
+          }
+          if (hasRuntimeLastError()) {
+            let errMsg = getRuntimeLastErrorMessage();
+            if (isContextInvalidatedError(errMsg)) {
+              handleContextInvalidated();
+              return;
+            }
+            if (isStorageQuotaError(errMsg)) {
+              finishSaveState(true);
+              return;
+            }
+            console.warn("[InboxSort] saveState get runtime error:", errMsg);
+            finishSaveState(false);
+            return;
+          }
+          let prefs = stored && stored.labelPrefs && typeof stored.labelPrefs === "object" ? stored.labelPrefs : {};
           prefs[getCurrentLabel()] = currentSort;
           data.labelPrefs = prefs;
-          try {
-            chrome.storage.sync.set(data, function () {
-              if (hasRuntimeLastError() || !isExtensionContextValid()) {
-                handleContextInvalidated();
-              }
-            });
-          } catch (setErr) {
-            if (isContextInvalidatedError(setErr) || !isExtensionContextValid()) {
-              handleContextInvalidated();
-            } else {
-              console.warn("[InboxSort] saveState set error:", setErr);
-            }
-          }
+          persistStateSnapshot(data);
         });
-      } else {
-        // Global: save sortMode + accentColor + groupEnabled
-        chrome.storage.sync.set(data, function () {
-          if (hasRuntimeLastError() || !isExtensionContextValid()) {
-            handleContextInvalidated();
-          }
-        });
+      } catch (getErr) {
+        if (isContextInvalidatedError(getErr) || !isExtensionContextValid()) {
+          handleContextInvalidated();
+          return;
+        }
+        if (isStorageQuotaError(String(getErr && getErr.message || getErr || ""))) {
+          finishSaveState(true);
+          return;
+        }
+        console.warn("[InboxSort] saveState get error:", getErr);
+        finishSaveState(false);
       }
-    } catch (e) {
-      if (isContextInvalidatedError(e) || !isExtensionContextValid()) {
-        handleContextInvalidated();
-      } else {
-        console.warn("[InboxSort] saveState error:", e);
-      }
+      return;
     }
+
+    // Global: save sortMode + accentColor + groupEnabled
+    persistStateSnapshot(data);
+  }
+
+  function saveState() {
+    if (!isExtensionContextValid()) { handleContextInvalidated(); return; }
+    _saveStatePending = true;
+    scheduleSaveState(CONFIG.SAVE_STATE_DEBOUNCE);
   }
 
   function loadState(callback) {
@@ -734,9 +852,11 @@
 
   let _rowMeta = new WeakMap();
 
-  function getRowMeta(row) {
+  function getRowMeta(row, forceRefresh) {
+    if (forceRefresh === undefined) forceRefresh = false;
+    let now = Date.now();
     let cached = _rowMeta.get(row);
-    if (cached) return cached;
+    if (!forceRefresh && cached && (now - cached.ts) < CONFIG.ROW_META_TTL) return cached.value;
     let meta = {
       sender: getSenderFromRow(row),
       date: getDateFromRow(row),
@@ -744,7 +864,7 @@
       starred: isRowStarred(row),
       attachment: isRowHasAttachment(row)
     };
-    _rowMeta.set(row, meta);
+    _rowMeta.set(row, { value: meta, ts: now });
     return meta;
   }
 
@@ -796,9 +916,12 @@
   // ── CSS-transform sorting ─────────────────────────────────────────
 
   function applySortTransforms(mode, animate, skipClear) {
+    if (_sortInProgress) return 0;
+    _sortInProgress = true;
+    try {
     if (animate === undefined) animate = true;
     let rows = getVisibleEmailRows(true);
-    if (rows.length === 0) return 0;
+    if (rows.length === 0) { return 0; }
 
     // PERF: Read geometry FIRST before any style mutations to avoid layout thrashing.
     // getBoundingClientRect() forces synchronous layout; doing it before writes
@@ -921,6 +1044,7 @@
     for (let j = 0; j < sorted.length; j++) {
       let el = sorted[j].row;
       el.style.zIndex = "1";
+      el.style.willChange = "transform";
       if (animate) {
         el.style.transition = "transform " + CONFIG.SORT_TRANSITION_DURATION + " cubic-bezier(0.25, 0.1, 0.25, 1)";
         el.style.transitionDelay = Math.min(j * CONFIG.SORT_DELAY_INCREMENT, CONFIG.SORT_DELAY_MAX) + "ms";
@@ -934,6 +1058,7 @@
     _lastSortedRowCount = rows.length;
     _lastSortedRowElements = rows.slice(0, 3); // Store first few for identity-change detection
     return rows.length;
+    } finally { _sortInProgress = false; }
   }
 
   // ── Group badge helpers ──────────────────────────────────────────
@@ -1106,33 +1231,31 @@
   function startGroupStyleInterval() {
     stopGroupStyleInterval();
     _groupStyleTick = 0;
-    _groupStyleInterval = setInterval(function () {
+    _scheduleGroupStyleTick();
+  }
+
+  // Single-timer approach: avoids nested setInterval leak where the inner
+  // slow-phase interval could orphan if stopGroupStyleInterval races with
+  // the fast→slow transition. Uses setTimeout chaining with adaptive delay.
+  function _scheduleGroupStyleTick() {
+    var delay = _groupStyleTick < CONFIG.GROUP_FAST_TICKS
+      ? CONFIG.GROUP_FAST_INTERVAL
+      : CONFIG.GROUP_SLOW_INTERVAL;
+    _groupStyleInterval = setTimeout(function () {
       _groupStyleTick++;
-      if (!groupEnabled) {
+      if (!groupEnabled || _groupStyleTick >= CONFIG.GROUP_MAX_TICKS) {
         stopGroupStyleInterval();
         return;
       }
       _suppressObserver = true;
-      try { reapplyGroupStyles(); } finally { setTimeout(function () { _suppressObserver = false; }, 0); }
-      // After fast phase, slow down to maintenance interval
-      if (_groupStyleTick === CONFIG.GROUP_FAST_TICKS) {
-        clearInterval(_groupStyleInterval);
-        _groupStyleInterval = setInterval(function () {
-          _groupStyleTick++;
-          if (!groupEnabled || _groupStyleTick >= CONFIG.GROUP_MAX_TICKS) {
-            stopGroupStyleInterval();
-            return;
-          }
-          _suppressObserver = true;
-          try { reapplyGroupStyles(); } finally { setTimeout(function () { _suppressObserver = false; }, 0); }
-        }, CONFIG.GROUP_SLOW_INTERVAL);
-      }
-    }, CONFIG.GROUP_FAST_INTERVAL);
+      try { reapplyGroupStyles(); } finally { queueMicrotask(function () { _suppressObserver = false; }); }
+      _scheduleGroupStyleTick();
+    }, delay);
   }
 
   function stopGroupStyleInterval() {
     if (_groupStyleInterval) {
-      clearInterval(_groupStyleInterval);
+      clearTimeout(_groupStyleInterval);
       _groupStyleInterval = null;
     }
     _groupStyleTick = 0;
@@ -1154,6 +1277,7 @@
         s.transitionDelay = "0ms";
         s.transform = "";
         s.zIndex = "";
+        s.willChange = "";
         rows[i].classList.remove("gmail-sort-group-start", "gmail-sort-group-even", "gmail-sort-group-first");
         rows[i].removeAttribute("data-sort-group");
       }
@@ -1182,7 +1306,7 @@
 
         let pass = true;
 
-        let meta = getRowMeta(row);
+        let meta = getRowMeta(row, true);
         if (q && pass) {
           let subjectEl = row.querySelector("span.bog, span.bqe");
           let subject = subjectEl ? subjectEl.textContent.toLowerCase() : "";
@@ -1253,7 +1377,7 @@
     let unreadCount = 0, starredCount = 0, attachCount = 0;
 
     for (let i = 0; i < total; i++) {
-      let meta = getRowMeta(rows[i]);
+      let meta = getRowMeta(rows[i], true);
       if (meta.unread) unreadCount++;
       if (meta.starred) starredCount++;
       if (meta.attachment) attachCount++;
@@ -1566,20 +1690,23 @@
     if (mode === "newest") {
       currentSort = "newest";
       saveState();
-      refreshUI();
-      if (!silent) {
-        showNotification(groupEnabled ? "Grouped by sender" : "Default order restored");
-      }
 
       // If group is enabled, still need to apply transforms for grouping
+      // Apply transforms BEFORE refreshUI to avoid two-frame jump
       if (groupEnabled) {
         let gc = applySortTransforms("newest", !silent, true);
+        refreshUI();
+        if (!silent) showNotification("Grouped by sender");
         if (gc > 0) startGroupStyleInterval();
-      } else if (originalPage && location.hash !== originalPage) {
-        isNavigating = true;
-        location.hash = originalPage;
-        originalPage = null;
-        setTimeout(function () { isNavigating = false; }, CONFIG.NAVIGATION_TIMEOUT);
+      } else {
+        refreshUI();
+        if (!silent) showNotification("Default order restored");
+        if (originalPage && location.hash !== originalPage) {
+          isNavigating = true;
+          location.hash = originalPage;
+          originalPage = null;
+          setTimeout(function () { isNavigating = false; }, CONFIG.NAVIGATION_TIMEOUT);
+        }
       }
       return;
     }
@@ -1620,7 +1747,7 @@
         } else {
           if (!silent) showNotification("Timed out. Try again.");
         }
-        } finally { setTimeout(function () { _suppressObserver = false; }, 0); }
+        } finally { queueMicrotask(function () { _suppressObserver = false; }); }
       });
       return;
     }
@@ -1643,7 +1770,7 @@
       startGroupStyleInterval();
     }
 
-    } finally { setTimeout(function () { _suppressObserver = false; }, 0); }
+    } finally { queueMicrotask(function () { _suppressObserver = false; }); }
   }
 
   // ── Toggle group overlay ───────────────────────────────────────────
@@ -1677,7 +1804,7 @@
     } else {
       showNotification("Grouping off");
     }
-    } finally { setTimeout(function () { _suppressObserver = false; }, 0); }
+    } finally { queueMicrotask(function () { _suppressObserver = false; }); }
   }
 
   // ── Snooze sort ───────────────────────────────────────────────────
@@ -2029,7 +2156,8 @@
 
   // ── Event handlers (capturing phase for clicks) ───────────────────
 
-  document.addEventListener("click", function (e) {
+  function onDocumentClick(e) {
+    if (_contextInvalid) return;
     if (!e.target) return;
 
     try {
@@ -2127,9 +2255,11 @@
     } catch (err) {
       console.warn("[InboxSort] click handler error:", err);
     }
-  }, true);
+  }
+  document.addEventListener("click", onDocumentClick, true);
 
-  document.addEventListener("mousedown", function (e) {
+  function onDocumentMousedown(e) {
+    if (_contextInvalid) return;
     if (!e.target) return;
     try {
       // Stats bar
@@ -2157,10 +2287,12 @@
     } catch (err) {
       console.warn("[InboxSort] mousedown handler error:", err);
     }
-  }, true);
+  }
+  document.addEventListener("mousedown", onDocumentMousedown, true);
 
   // Search input (bubbling phase, debounced 150ms)
-  document.addEventListener("input", function (e) {
+  function onDocumentInput(e) {
+    if (_contextInvalid) return;
     if (!e.target || !e.target.classList || !e.target.classList.contains("gmail-sort-search-input")) return;
     searchQuery = e.target.value;
     if (_searchDebounce) clearTimeout(_searchDebounce);
@@ -2168,10 +2300,12 @@
       _searchDebounce = null;
       applyAllFilters();
     }, CONFIG.SEARCH_DEBOUNCE);
-  }, false);
+  }
+  document.addEventListener("input", onDocumentInput, false);
 
   // Escape key in search input (capturing phase)
-  document.addEventListener("keydown", function (e) {
+  function onDocumentKeydown(e) {
+    if (_contextInvalid) return;
     if (!e.target || !e.target.classList) return;
 
     // Search input: Escape clears search text; Alt+key combos fall through
@@ -2270,7 +2404,8 @@
         e.stopPropagation();
       }
     }
-  }, true);
+  }
+  document.addEventListener("keydown", onDocumentKeydown, true);
 
   // ── Auto-sort on page load ────────────────────────────────────────
 
@@ -2496,7 +2631,7 @@
                 refreshUI();
                 if (groupEnabled) startGroupStyleInterval();
               } finally {
-                setTimeout(function () { _suppressObserver = false; }, 0);
+                queueMicrotask(function () { _suppressObserver = false; });
               }
             }
           }
@@ -2504,7 +2639,10 @@
       }, CONFIG.OBSERVER_DEBOUNCE);
     });
 
-    _observer.observe(document.body, { childList: true, subtree: true });
+    // Prefer observing div[role="main"] to avoid firing on compose, sidebars,
+    // chat, etc.  Falls back to document.body if Gmail's layout hasn't loaded.
+    let observeRoot = document.querySelector('div[role="main"]') || document.body;
+    _observer.observe(observeRoot, { childList: true, subtree: true });
   }
 
   // ── Message listener (from popup) ─────────────────────────────────
@@ -2615,6 +2753,10 @@
     if (_groupStyleInterval) { clearInterval(_groupStyleInterval); _groupStyleInterval = null; }
     if (_observerDebounce)   { clearTimeout(_observerDebounce);    _observerDebounce = null; }
     if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
+    if (_saveStateTimer)     { clearTimeout(_saveStateTimer);      _saveStateTimer = null; }
+    _saveStatePending = false;
+    _saveStateInFlight = false;
+    _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
     if (snoozeTimer)         { clearTimeout(snoozeTimer);          snoozeTimer = null; }
     if (snoozeTickTimer)     { clearInterval(snoozeTickTimer);     snoozeTickTimer = null; }
     if (_observer)           { _observer.disconnect();             _observer = null; }
@@ -2627,6 +2769,11 @@
       }
       _hiddenTabsRetryTimers = [];
     }
+    document.removeEventListener("click", onDocumentClick, true);
+    document.removeEventListener("mousedown", onDocumentMousedown, true);
+    document.removeEventListener("input", onDocumentInput, false);
+    document.removeEventListener("keydown", onDocumentKeydown, true);
+    clearAccentColorVars();
   });
 
   // ── Initialisation ────────────────────────────────────────────────
