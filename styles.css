@@ -61,6 +61,8 @@
   position: relative !important;
   outline: none !important;
   box-shadow: none !important;
+}
+
   -webkit-appearance: none !important;
   appearance: none !important;
   flex-shrink: 0 !important;
@@ -68,6 +70,11 @@
   text-decoration: none !important;
   text-align: left !important;
   vertical-align: baseline !important;
+}
+
+.inboxsort-tab:focus-visible {
+  outline: 2px solid var(--sort-accent, #1a73e8) !important;
+  outline-offset: -2px !important;
 }
 
 .gmail-sort-tab:hover {
@@ -213,6 +220,11 @@
   box-sizing: border-box !important;
 }
 
+.gmail-sort-search-input:focus-visible {
+  outline: 2px solid var(--sort-accent, #1a73e8) !important;
+  outline-offset: -2px !important;
+}
+
 .gmail-sort-search-input::placeholder {
   color: #9aa0a6 !important;
   opacity: 1 !important;
@@ -250,6 +262,11 @@
   outline: none !important;
   -webkit-appearance: none !important;
   appearance: none !important;
+}
+
+.gmail-sort-search-close:focus-visible {
+  outline: 2px solid var(--sort-accent, #1a73e8) !important;
+  outline-offset: -2px !important;
 }
 
 .gmail-sort-search-input:not(:placeholder-shown) ~ .gmail-sort-search-close {
@@ -848,6 +865,11 @@ html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start.gma
   white-space: nowrap !important;
   margin-left: 6px !important;
   border: 1.5px solid var(--sort-accent) !important;
+}
+
+.gmail-sort-bulk-select:focus-visible {
+  outline: 2px solid var(--sort-accent, #1a73e8) !important;
+  outline-offset: -2px !important;
 }
 
 .gmail-sort-bulk-select:hover {

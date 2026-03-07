@@ -626,6 +626,12 @@ applyDarkMode();
 updatePopupState();
 updateTabVisibility();
 
+// Set version dynamically from manifest
+try {
+  var versionEl = document.getElementById("inboxsort-version");
+  if (versionEl) versionEl.textContent = "InboxSort v" + chrome.runtime.getManifest().version;
+} catch (_) {}
+
 // Show a hint if not on a Gmail tab
 getGmailTab(function (tab) {
   if (!tab) {

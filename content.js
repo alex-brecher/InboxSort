@@ -2,7 +2,7 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort — Content Script (v1.0.1)
+   *  InboxSort — Content Script (v1.1.0)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
    *  Features: 5 sort modes, group-by-sender toggle, stats bar, filters,
@@ -238,6 +238,8 @@
   let _saveStateInFlight  = false; // Single in-flight sync write guard
   let _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
   let _sortInProgress      = false; // Reentrancy guard for applySortTransforms
+  let _resizeDebounce      = null;  // Debounce timer for viewport resize re-sort
+  let _lastResizeWidth     = 0;     // Track viewport width to ignore height-only resizes
 
   // ── Current Gmail label ─────────────────────────────────────────
 
@@ -749,12 +751,19 @@
       }
 
       // Check aria-label / title on elements within the star cell
-      let allEls = starCell.querySelectorAll("[aria-label], [title]");
+      // Supports English ("starred"/"not starred") and uses data attribute
+      // as a locale-agnostic fallback for non-English Gmail
+      let allEls = starCell.querySelectorAll("[aria-label], [title], [data-tooltip]");
       for (let i = 0; i < allEls.length; i++) {
-        let lbl = (allEls[i].getAttribute("aria-label") || allEls[i].getAttribute("title") || "").toLowerCase();
+        let lbl = (allEls[i].getAttribute("aria-label") || allEls[i].getAttribute("title") || allEls[i].getAttribute("data-tooltip") || "").toLowerCase();
         if (lbl === "starred") return true;
         if (lbl.indexOf("starred") !== -1 && lbl.indexOf("not") === -1) return true;
       }
+
+      // Locale-agnostic fallback: check if the star cell's img/icon has a
+      // "checked" or "active" state via ARIA or class naming conventions
+      let ariaChecked = starCell.querySelector("[aria-checked='true'], [data-starred='true']");
+      if (ariaChecked) return true;
 
       // Check SVG fills (some themes use SVG stars)
       let svgs = starCell.getElementsByTagName("svg");
@@ -920,24 +929,27 @@
     _sortInProgress = true;
     try {
     if (animate === undefined) animate = true;
+    _lastResizeWidth = window.innerWidth; // Record width for resize detection
     let rows = getVisibleEmailRows(true);
     if (rows.length === 0) { return 0; }
 
     // PERF: Read geometry FIRST before any style mutations to avoid layout thrashing.
-    // getBoundingClientRect() forces synchronous layout; doing it before writes
-    // means we only trigger one reflow instead of N.
+    // Use offsetTop/offsetHeight instead of getBoundingClientRect() because:
+    // 1. offsetTop is relative to the offset parent (table/tbody), not the viewport
+    // 2. This makes positions stable regardless of scroll position
+    // 3. Gmail's lazy rendering at narrow viewports can cause getBoundingClientRect
+    //    to return incorrect viewport-relative positions before all rows are painted
     let items = new Array(rows.length);
     for (let r = 0; r < rows.length; r++) {
       let meta = getRowMeta(rows[r]);
-      let rect = rows[r].getBoundingClientRect();
       items[r] = {
         row: rows[r],
         date: meta.date,
         sender: meta.sender,
         unread: meta.unread,
         origIndex: r,
-        origTop: rect.top,
-        height: rect.height
+        origTop: rows[r].offsetTop,
+        height: rows[r].offsetHeight
       };
     }
 
@@ -1030,9 +1042,10 @@
     // Apply group styling and transforms SYNCHRONOUSLY.
     // Previous approach deferred to rAF, which could fail if Gmail's
     // MutationObserver replaced row elements between schedule and callback.
-    // Since getBoundingClientRect() above already forced a reflow (committing
-    // the cleared state), we can safely set transitions + transforms here and
-    // the browser will animate from the committed "cleared" positions.
+    // Since reading offsetTop/offsetHeight above already forced a reflow
+    // (committing the cleared state), we can safely set transitions +
+    // transforms here and the browser will animate from the committed
+    // "cleared" positions.
     try {
       if (groupData) {
         applyGroupVisuals(sorted, groupData);
@@ -1087,6 +1100,9 @@
   // Used by rAF, microtask, and interval-based re-applications.
 
   function applyGroupVisuals(sortedArr, gData) {
+    // Clear any existing badges first to prevent duplication on rapid re-application
+    clearGroupBadges();
+
     let gac = gData.ac;
     let gpr = gData.perRow;
     let styledCount = 0;
@@ -1284,6 +1300,9 @@
       invalidateRowCache();
       _lastSortedRowCount = 0;
       _lastSortedRowElements = null;
+      // Force synchronous reflow so subsequent geometry reads
+      // (offsetTop, offsetHeight) reflect the cleared transforms.
+      void document.documentElement.offsetHeight;
     } finally {
       _suppressObserver = wasSuppressed;
     }
@@ -1577,7 +1596,7 @@
     ];
 
     let html = '<div class="gmail-sort-cheatsheet-title">' + ICONS.keyboard + ' Keyboard Shortcuts</div>' +
-               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v1.0.1 — Made by Alex Brecher</div>';
+               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.1.0') + ' — Made by Alex Brecher</div>';
 
     for (let i = 0; i < shortcuts.length; i++) {
       let s = shortcuts[i];
@@ -1686,6 +1705,9 @@
     }
 
     clearSortTransforms();
+    // Note: clearSortTransforms() internally forces a synchronous reflow
+    // after clearing transforms, ensuring applySortTransforms() reads
+    // correct post-clear geometry (offsetTop/offsetHeight).
 
     if (mode === "newest") {
       currentSort = "newest";
@@ -1873,6 +1895,7 @@
       let modes = (tabs[i].getAttribute("data-modes") || "").split(",");
       let isActive = modes.indexOf(currentSort) !== -1;
       tabs[i].classList.toggle("gmail-sort-tab-active", isActive);
+      tabs[i].setAttribute("aria-pressed", isActive ? "true" : "false");
 
       let iconEl = tabs[i].querySelector(".gmail-sort-tab-icon");
       let labelEl = tabs[i].querySelector(".gmail-sort-tab-label");
@@ -1902,6 +1925,7 @@
     let groupBtn = container.querySelector(".gmail-sort-group-toggle");
     if (groupBtn) {
       groupBtn.classList.toggle("gmail-sort-tab-active", groupEnabled);
+      groupBtn.setAttribute("aria-pressed", groupEnabled ? "true" : "false");
     }
   }
 
@@ -1913,6 +1937,8 @@
 
     let toast = document.createElement("div");
     toast.className = "gmail-sort-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
     if (isDarkMode) toast.classList.add("gmail-sort-dark");
     toast.textContent = message;
     document.body.appendChild(toast);
@@ -2117,8 +2143,8 @@
     // ─ Search (fills remaining space) ─
     container.appendChild(searchWrap);
 
-    // Insert container above toolbar
-    toolbar.parentNode.insertBefore(container, toolbar);
+    // Insert container below Gmail's action bar (between toolbar and email rows)
+    toolbar.after(container);
 
     applyAccentColor();
     // Pull latest hidden-tab prefs at inject time in case storage listeners
@@ -2773,7 +2799,33 @@
     document.removeEventListener("mousedown", onDocumentMousedown, true);
     document.removeEventListener("input", onDocumentInput, false);
     document.removeEventListener("keydown", onDocumentKeydown, true);
+    if (_resizeDebounce)     { clearTimeout(_resizeDebounce);      _resizeDebounce = null; }
     clearAccentColorVars();
+  });
+
+  // ── Viewport resize: re-sort when Gmail changes row heights ──────
+  // Gmail switches between compact (~28px) and multi-line (~68px) row
+  // formats at different viewport widths. When this happens, the CSS
+  // transforms from a previous sort become invalid (wrong heights),
+  // causing rows to overlap or disappear. This listener re-applies
+  // the current sort after Gmail re-renders at the new width.
+
+  window.addEventListener("resize", function () {
+    // Only re-sort if transforms are actively applied
+    if (currentSort === "newest" && !groupEnabled) return;
+
+    let w = window.innerWidth;
+    // Ignore height-only changes and trivial width jitter (< 10px)
+    if (Math.abs(w - _lastResizeWidth) < 10) return;
+    _lastResizeWidth = w;
+
+    if (_resizeDebounce) clearTimeout(_resizeDebounce);
+    _resizeDebounce = setTimeout(function () {
+      _resizeDebounce = null;
+      // Gmail may take a moment to re-render rows at the new width.
+      // Re-apply current sort silently (no notification, no snooze cancel).
+      applySort(currentSort, true);
+    }, 300);
   });
 
   // ── Initialisation ────────────────────────────────────────────────
