@@ -2,7 +2,7 @@
 
 **A privacy-first Chrome extension that visually sorts and filters Gmail by date, sender, or unread status.**
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome-Add%20to%20Chrome-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/inboxsort-gmail-email-sor/...)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Add%20to%20Chrome-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/inboxsort/mmbbiejiidimjaceddigelomncimdegb)
 
 Gmail gives you labels, stars, and categories — but no way to sort your inbox by sender name or push unread messages to the top. InboxSort adds a clean, native-feeling toolbar directly into Gmail with one-click sorting, real-time filters, live search, keyboard shortcuts, and a stats bar.
 
@@ -91,7 +91,7 @@ Automatic detection of Gmail's dark theme — no configuration needed. Dedicated
 
 ## Installation
 
-1. Visit the **[InboxSort page on the Chrome Web Store](https://chromewebstore.google.com/detail/inboxsort-gmail-email-sor/...)**.
+1. Visit the **[InboxSort page on the Chrome Web Store](https://chromewebstore.google.com/detail/inboxsort/mmbbiejiidimjaceddigelomncimdegb)**.
 2. Click **Add to Chrome**.
 3. Confirm by clicking **Add extension**.
 4. Open [Gmail](https://mail.google.com). The sort toolbar appears below Gmail's action bar.
