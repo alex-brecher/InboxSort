@@ -5,7 +5,7 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
-## [Unreleased]
+## [1.2.0] -- 2026-08-21
 
 ### Added
 - Added a Starred First sort mode. It puts starred messages first and sorts each star group by newest date.
