@@ -5,7 +5,7 @@
    *  InboxSort — Content Script (v1.1.0)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
-   *  Features: 5 sort modes, group-by-sender toggle, stats bar, filters,
+   *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
    *  keyboard shortcuts, snooze, per-label prefs, auto-sort toggle.
    * ================================================================ */
 
@@ -64,7 +64,8 @@
     { id: "newest",      label: "Default order",           tabLabel: "Newest",  icon: "newest",      group: "date" },
     { id: "senderAZ",    label: "Sorted sender A\u2192Z",  tabLabel: "A\u2192Z", icon: "senderAZ",  group: "sender" },
     { id: "senderZA",    label: "Sorted sender Z\u2192A",  tabLabel: "Z\u2192A", icon: "senderZA",  group: "sender" },
-    { id: "unreadFirst", label: "Unread first",            tabLabel: "Unread",  icon: "unreadFirst" }
+    { id: "unreadFirst", label: "Unread first",            tabLabel: "Unread",  icon: "unreadFirst" },
+    { id: "starredFirst", label: "Starred first, then newest", tabLabel: "Starred", icon: "starred" }
   ];
 
   function isKnownSortMode(mode) {
@@ -89,7 +90,8 @@
   const TAB_GROUPS = [
     { id: "date",   modes: ["oldest"],                 defaultLabel: "Date",   defaultIcon: "newest" },
     { id: "sender", modes: ["senderAZ", "senderZA"],   defaultLabel: "Sender", defaultIcon: "senderAZ" },
-    { id: "unread", modes: ["unreadFirst"],             defaultLabel: "Unread", defaultIcon: "unreadFirst" }
+    { id: "unread", modes: ["unreadFirst"],             defaultLabel: "Unread", defaultIcon: "unreadFirst" },
+    { id: "starred", modes: ["starredFirst"],           defaultLabel: "Starred", defaultIcon: "starred" }
   ];
 
   // ── Accent colour palette ──────────────────────────────────────────
@@ -903,6 +905,13 @@
       if (!a.date) return 1;
       if (!b.date) return -1;
       return b.date.getTime() - a.date.getTime();
+    },
+    starredFirst: function (a, b) {
+      if (a.starred !== b.starred) return a.starred ? -1 : 1;
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.getTime() - a.date.getTime();
     }
   };
 
@@ -947,6 +956,7 @@
         date: meta.date,
         sender: meta.sender,
         unread: meta.unread,
+        starred: meta.starred,
         origIndex: r,
         origTop: rows[r].offsetTop,
         height: rows[r].offsetHeight
@@ -1587,6 +1597,7 @@
       { key: "Alt + 4", label: "Sender Z\u2192A" },
       { key: "Alt + 5", label: "Unread First" },
       { key: "Alt + 6", label: "Toggle Group by Sender" },
+      { key: "Alt + 7", label: "Starred First" },
       { section: "Filters & Search" },
       { key: "/", label: "Focus search bar" },
       { key: "Esc", label: "Clear search / close" },
@@ -1774,7 +1785,7 @@
       return;
     }
 
-    // senderAZ, senderZA, unreadFirst
+    // senderAZ, senderZA, unreadFirst, starredFirst
     let modeObj = null;
     for (let mi = 0; mi < SORT_MODES.length; mi++) {
       if (SORT_MODES[mi].id === mode) { modeObj = SORT_MODES[mi]; break; }
@@ -2412,6 +2423,7 @@
         case "Digit4": applySort("senderZA", false); break;
         case "Digit5": applySort("unreadFirst", false); break;
         case "Digit6": toggleGroup(); break;
+        case "Digit7": applySort("starredFirst", false); break;
         case "Slash": toggleCheatSheet(); break;
         case "Digit0":
           clearFilters();

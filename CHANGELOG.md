@@ -5,6 +5,14 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [Unreleased]
+
+### Added
+- Added a Starred First sort mode. It puts starred messages first and sorts each star group by newest date.
+- Added the Alt+7 shortcut for Starred First. Alt+6 still controls Group by Sender.
+
+---
+
 ## [1.1.0] -- 2026-03-07
 
 ### Added

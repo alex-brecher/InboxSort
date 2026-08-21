@@ -4,9 +4,9 @@
 **InboxSort - Gmail Email Sorter**
 
 ## Short Description (132 characters max)
-Sort Gmail by date, sender, or unread status. Inline tabs, real-time filters, keyboard shortcuts, and stats -- all inside Gmail.
+Sort Gmail by date, sender, star, or unread status. Use inline tabs, real-time filters, keyboard shortcuts, and stats inside Gmail.
 
-*(130 characters)*
+*(131 characters)*
 
 ## Detailed Description
 
@@ -38,8 +38,9 @@ A slim stats bar sits below your sort tabs showing real-time counts: total email
 **KEYBOARD SHORTCUTS**
 
 Power through your inbox without touching the mouse:
-- Alt+1 through Alt+5: Switch sort modes instantly
+- Alt+1 through Alt+5: Select the original sort modes
 - Alt+6: Toggle Group by Sender
+- Alt+7: Sort starred messages first
 - Alt+0: Clear all filters
 - / (slash): Jump to the filter search bar
 - ?: Open the keyboard shortcut cheat sheet

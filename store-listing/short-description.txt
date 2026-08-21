@@ -1,1 +1,1 @@
-Sort your Gmail inbox by date, sender, or unread status. Group by sender, filter starred/unread/attachments, inline search, keyboard shortcuts, stats — native Gmail look.
+Sort Gmail by date, sender, star, or unread status. Group by sender, filter messages, search, and view inbox stats.

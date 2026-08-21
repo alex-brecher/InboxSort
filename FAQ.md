@@ -27,15 +27,16 @@ Click the InboxSort icon in your Chrome toolbar (top-right of the browser, near 
 
 ### What sort options are available?
 
-InboxSort offers five sort modes:
+InboxSort offers six sort modes:
 
 - **Oldest First** -- Places the oldest emails at the top of the page
 - **Newest First** -- Restores Gmail's default order (newest on top)
 - **Sender A to Z** -- Sorts alphabetically by sender name
 - **Sender Z to A** -- Sorts in reverse alphabetical order by sender
 - **Unread First** -- Moves all unread emails to the top of the page
+- **Starred First** -- Moves starred emails to the top, then sorts each group by newest date
 
-You can switch between these by clicking the tabs in the toolbar or using keyboard shortcuts (Alt+1 through Alt+5).
+Use a toolbar tab or the applicable keyboard shortcut to select a sort mode.
 
 ### What does "Group by Sender" do?
 
@@ -43,7 +44,7 @@ Group by Sender adds a visual overlay that clusters consecutive emails from the 
 
 Group by Sender works alongside any sort mode. For example, you can sort by date and still see sender groups, or sort by sender A-Z and see the group badges for a clearer visual separation.
 
-Toggle it with the Group button in the toolbar or press Alt+6.
+Use the Group button in the toolbar or press Alt+6.
 
 ### How do Quick Filters work?
 
@@ -75,6 +76,7 @@ Press / (forward slash) to jump to the filter bar. Press Escape or click the X t
 | Alt+4 | Sort: Sender Z to A |
 | Alt+5 | Sort: Unread First |
 | Alt+6 | Toggle Group by Sender |
+| Alt+7 | Sort: Starred First |
 | Alt+0 | Clear all active filters |
 | / | Focus the filter search bar |
 | Esc | Clear search / close overlay |

@@ -28,7 +28,9 @@ Stats Bar:
 • Click any stat to toggle it as a filter
 
 Keyboard Shortcuts:
-• Alt+1 through Alt+6 for each sort mode
+• Alt+1 through Alt+5 for the original sort modes
+• Alt+6 to group messages by sender
+• Alt+7 to sort starred messages first
 • Alt+0 to reset to default
 
 Settings:

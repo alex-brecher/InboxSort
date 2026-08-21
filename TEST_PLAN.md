@@ -56,7 +56,9 @@
 | TC-2.03 | Click Sender tab once -- activates "senderAZ"; emails sort alphabetically by sender (A at top) | P0 | `[ ]` | Uses `localeCompare` on sender from `span[email]` or `span.bA4` |
 | TC-2.04 | Click Sender tab again -- cycles to "senderZA"; emails sort Z-A | P0 | `[ ]` | |
 | TC-2.05 | Click Unread tab -- activates "unreadFirst"; unread emails (`tr.zE`) appear above read emails | P0 | `[ ]` | Stable sort preserves original order within groups |
-| TC-2.06 | Tab cycling: Date tab clicks: oldest -> newest -> deactivate (no highlight). Sender: senderAZ -> senderZA -> deactivate. Unread: unreadFirst -> deactivate | P1 | `[ ]` | `TAB_GROUPS` defines cycle order |
+| TC-2.05a | Click Starred tab -- activates "starredFirst"; starred emails appear above unstarred emails | P0 | `[ ]` | Newest date is the secondary sort for both groups |
+| TC-2.05b | Sort starred and unstarred rows that include missing dates | P1 | `[ ]` | Rows without dates remain at the end of their star group |
+| TC-2.06 | Cycle each toolbar tab through its modes and back to the inactive state | P1 | `[ ]` | Date, Sender, Unread, and Starred use `TAB_GROUPS` |
 | TC-2.07 | Switching tabs: activate oldest via Date, then click Sender -- Date deactivates, Sender activates senderAZ; only one sort mode active at a time | P1 | `[ ]` | |
 | TC-2.08 | Sort uses CSS `transform: translateY()` and does NOT reorder DOM elements | P1 | `[ ]` | Inspect via DevTools Elements panel |
 | TC-2.09 | Sort handles variable row heights correctly -- no overlapping or gaps between rows | P1 | `[ ]` | `applySortTransforms()` uses actual `offsetTop`/`offsetHeight` per row |
@@ -149,7 +151,8 @@
 | TC-7.03 | `Alt+3` activates "senderAZ" sort | P0 | `[ ]` | |
 | TC-7.04 | `Alt+4` activates "senderZA" sort | P0 | `[ ]` | |
 | TC-7.05 | `Alt+5` activates "unreadFirst" sort | P0 | `[ ]` | |
-| TC-7.06 | `Alt+6` toggles group-by-sender on/off | P1 | `[ ]` | |
+| TC-7.05a | `Alt+7` activates "starredFirst" sort | P0 | `[ ]` | |
+| TC-7.06 | `Alt+6` toggles group-by-sender on/off | P0 | `[ ]` | Existing shortcut stays unchanged |
 | TC-7.07 | `Alt+0` clears all sorts, filters, and grouping | P1 | `[ ]` | |
 | TC-7.08 | `/` focuses InboxSort search input (prevents character from being typed via `preventDefault()`) | P1 | `[ ]` | Only when no input/textarea/contenteditable is focused |
 | TC-7.09 | `?` opens keyboard shortcut cheat sheet overlay | P1 | `[ ]` | Only when not in editable target |
@@ -168,7 +171,7 @@
 
 | ID | Test Case | Priority | Status | Notes |
 |----|-----------|----------|--------|-------|
-| TC-8.01 | Click each sort option in popup (Newest, Oldest, Sender A-Z, Sender Z-A, Unread First) -- Gmail applies selected sort | P0 | `[ ]` | Sends `applySort` message via `sendToContent()` |
+| TC-8.01 | Click each popup sort option, including Starred First | P0 | `[ ]` | Gmail applies the selected sort through `sendToContent()` |
 | TC-8.02 | Selected sort option shows checkmark and accent-light background; optimistic UI update before content script confirms | P1 | `[ ]` | |
 | TC-8.03 | Toggle "Group by Sender" switch -- Gmail groups/ungroups emails | P1 | `[ ]` | Sends `toggleGroup` / `setGroupEnabled` message |
 | TC-8.04 | Select each of 6 accent colors (blue, green, purple, orange, red, teal) -- toolbar and group visuals update | P1 | `[ ]` | CSS custom properties: `--accent`, `--accent-hover`, `--accent-light`, `--accent-dark` |
