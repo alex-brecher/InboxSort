@@ -4,9 +4,9 @@
 **InboxSort - Gmail Email Sorter**
 
 ## Short Description (132 characters max)
-Sort Gmail by date, sender, star, or unread status. Use inline tabs, real-time filters, keyboard shortcuts, and stats inside Gmail.
+Sort Gmail by date, sender, starred status, or unread status. Use filters, search, grouping, and message counts inside Gmail.
 
-*(131 characters)*
+*(125 characters)*
 
 ## Detailed Description
 
