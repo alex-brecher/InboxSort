@@ -54,6 +54,9 @@ WHY INBOXSORT?
 • Dark mode support
 • Fast and responsive
 
+OPEN SOURCE:
+• Review the source code or report an issue at https://github.com/alex-brecher/InboxSort
+
 PERMISSIONS:
 • activeTab: Required to read and sort your email list
 • storage: Required to save and sync your sort preferences
