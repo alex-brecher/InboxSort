@@ -2,7 +2,7 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort — Content Script (v1.2.0)
+   *  InboxSort — Content Script (v1.2.1)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
    *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
@@ -1607,7 +1607,7 @@
     ];
 
     let html = '<div class="gmail-sort-cheatsheet-title">' + ICONS.keyboard + ' Keyboard Shortcuts</div>' +
-               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.0') + ' — Made by Alex Brecher</div>';
+               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.1') + ' — Made by Alex Brecher</div>';
 
     for (let i = 0; i < shortcuts.length; i++) {
       let s = shortcuts[i];
@@ -1969,7 +1969,9 @@
    * isListView — Determines whether the current Gmail view is a message list
    * (inbox, label, category) vs. a single-message/thread view.
    *
-   * Gmail encodes thread IDs in the URL hash as the last path segment.
+   * Gmail encodes normal thread IDs in the URL hash as the last path segment.
+   * Messages opened in their own window use a `/popout` route (or an older
+   * query-string message view) and must also be treated as thread views.
    * Thread IDs are long (≥15 chars), Base64-ish strings (alphanumeric + dash + underscore).
    * Examples:  #inbox/FMfcgzQXKhbfGqQlChrCxfZVSvxBpmJB   ← thread view
    *            #inbox/p2                                   ← list view, page 2
@@ -1980,6 +1982,19 @@
    * This avoids false positives from short label names, pagination tokens, etc.
    */
   function isListView() {
+    // Gmail's "Open in new window" route does not use the normal hash-based
+    // thread URL. Current Gmail uses /popout; older/alternate message-only
+    // routes use view=btop, view=pt, or view=om.
+    if (/\/popout\/?$/.test(location.pathname)) return false;
+
+    let standaloneView = "";
+    try {
+      standaloneView = new URLSearchParams(location.search).get("view") || "";
+    } catch (_) { /* fall through to hash detection */ }
+    if (standaloneView === "btop" || standaloneView === "pt" || standaloneView === "om") {
+      return false;
+    }
+
     let hash = location.hash;
     if (hash === "" || hash === "#" || hash === "#inbox") return true;
     if (/^#inbox\/p\d+$/.test(hash)) return true;
@@ -2082,6 +2097,11 @@
 
     container = document.createElement("div");
     container.className = "gmail-sort-container";
+    // Apply visibility synchronously so thread-only views never flash the
+    // toolbar while storage preferences are still loading.
+    if (!isListView() || isExcludedLabel()) {
+      container.classList.add("gmail-sort-hidden");
+    }
     container.setAttribute("role", "toolbar");
     container.setAttribute("aria-label", "InboxSort — email sorting and filtering");
     if (isDarkMode) container.classList.add("gmail-sort-dark");
