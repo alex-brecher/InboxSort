@@ -1,25 +1,25 @@
-InboxSort — Sort your inbox your way
+InboxSort: Sort your inbox your way
 
 Sort Gmail by date, sender, starred status, or unread status. InboxSort adds sorting, filters, search, and message counts inside Gmail.
 
 FEATURES:
 
 Sort Modes (6 options):
-• Oldest First — See your oldest emails at the top
-• Newest First — Gmail's default order (one click to restore)
-• Sender A–Z — Alphabetical by sender name
-• Sender Z–A — Reverse alphabetical order
-• Unread First — Prioritize your unread messages
-• Starred First — Put starred messages first, then sort each group by newest date
+• Oldest First: See your oldest emails at the top
+• Newest First: Restore Gmail's default order with one click
+• Sender A to Z: Sort by sender name in alphabetical order
+• Sender Z to A: Sort by sender name in reverse alphabetical order
+• Unread First: Put unread messages first
+• Starred First: Put starred messages first, then sort each group by newest date
 
 Group by Sender:
 • Cluster messages from the same sender
 • Use grouping with each sort mode
 
 Quick Filters:
-• Starred — Show only starred emails
-• Unread — Show only unread messages
-• Attachments — Show only emails with attachments
+• Starred: Show only starred emails
+• Unread: Show only unread messages
+• Attachments: Show only emails with attachments
 • Combine multiple filters at once
 
 Inline Search:
@@ -46,9 +46,9 @@ Settings:
 
 WHY INBOXSORT?
 
-• Feels native to Gmail — designed to look like it belongs
-• Lightweight — uses CSS transforms for visual sorting
-• Privacy first — no data leaves your browser, no tracking
+• Uses a toolbar that matches Gmail
+• Uses CSS transforms for fast visual sorting
+• Keeps your data in your browser and does not use tracking
 • Works on all Gmail views and labels
 • Settings sync across all your Chrome browsers
 • Dark mode support
