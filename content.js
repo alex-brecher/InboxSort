@@ -2,10 +2,10 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort — Content Script (v1.1.0)
+   *  InboxSort — Content Script (v1.2.1)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
-   *  Features: 5 sort modes, group-by-sender toggle, stats bar, filters,
+   *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
    *  keyboard shortcuts, snooze, per-label prefs, auto-sort toggle.
    * ================================================================ */
 
@@ -64,7 +64,8 @@
     { id: "newest",      label: "Default order",           tabLabel: "Newest",  icon: "newest",      group: "date" },
     { id: "senderAZ",    label: "Sorted sender A\u2192Z",  tabLabel: "A\u2192Z", icon: "senderAZ",  group: "sender" },
     { id: "senderZA",    label: "Sorted sender Z\u2192A",  tabLabel: "Z\u2192A", icon: "senderZA",  group: "sender" },
-    { id: "unreadFirst", label: "Unread first",            tabLabel: "Unread",  icon: "unreadFirst" }
+    { id: "unreadFirst", label: "Unread first",            tabLabel: "Unread",  icon: "unreadFirst" },
+    { id: "starredFirst", label: "Starred first, then newest", tabLabel: "Starred", icon: "starred" }
   ];
 
   function isKnownSortMode(mode) {
@@ -89,7 +90,8 @@
   const TAB_GROUPS = [
     { id: "date",   modes: ["oldest"],                 defaultLabel: "Date",   defaultIcon: "newest" },
     { id: "sender", modes: ["senderAZ", "senderZA"],   defaultLabel: "Sender", defaultIcon: "senderAZ" },
-    { id: "unread", modes: ["unreadFirst"],             defaultLabel: "Unread", defaultIcon: "unreadFirst" }
+    { id: "unread", modes: ["unreadFirst"],             defaultLabel: "Unread", defaultIcon: "unreadFirst" },
+    { id: "starred", modes: ["starredFirst"],           defaultLabel: "Starred", defaultIcon: "starred" }
   ];
 
   // ── Accent colour palette ──────────────────────────────────────────
@@ -903,6 +905,13 @@
       if (!a.date) return 1;
       if (!b.date) return -1;
       return b.date.getTime() - a.date.getTime();
+    },
+    starredFirst: function (a, b) {
+      if (a.starred !== b.starred) return a.starred ? -1 : 1;
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.getTime() - a.date.getTime();
     }
   };
 
@@ -947,6 +956,7 @@
         date: meta.date,
         sender: meta.sender,
         unread: meta.unread,
+        starred: meta.starred,
         origIndex: r,
         origTop: rows[r].offsetTop,
         height: rows[r].offsetHeight
@@ -1587,6 +1597,7 @@
       { key: "Alt + 4", label: "Sender Z\u2192A" },
       { key: "Alt + 5", label: "Unread First" },
       { key: "Alt + 6", label: "Toggle Group by Sender" },
+      { key: "Alt + 7", label: "Starred First" },
       { section: "Filters & Search" },
       { key: "/", label: "Focus search bar" },
       { key: "Esc", label: "Clear search / close" },
@@ -1596,7 +1607,7 @@
     ];
 
     let html = '<div class="gmail-sort-cheatsheet-title">' + ICONS.keyboard + ' Keyboard Shortcuts</div>' +
-               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.1.0') + ' — Made by Alex Brecher</div>';
+               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.1') + ' — Made by Alex Brecher</div>';
 
     for (let i = 0; i < shortcuts.length; i++) {
       let s = shortcuts[i];
@@ -1774,7 +1785,7 @@
       return;
     }
 
-    // senderAZ, senderZA, unreadFirst
+    // senderAZ, senderZA, unreadFirst, starredFirst
     let modeObj = null;
     for (let mi = 0; mi < SORT_MODES.length; mi++) {
       if (SORT_MODES[mi].id === mode) { modeObj = SORT_MODES[mi]; break; }
@@ -1958,7 +1969,9 @@
    * isListView — Determines whether the current Gmail view is a message list
    * (inbox, label, category) vs. a single-message/thread view.
    *
-   * Gmail encodes thread IDs in the URL hash as the last path segment.
+   * Gmail encodes normal thread IDs in the URL hash as the last path segment.
+   * Messages opened in their own window use a `/popout` route (or an older
+   * query-string message view) and must also be treated as thread views.
    * Thread IDs are long (≥15 chars), Base64-ish strings (alphanumeric + dash + underscore).
    * Examples:  #inbox/FMfcgzQXKhbfGqQlChrCxfZVSvxBpmJB   ← thread view
    *            #inbox/p2                                   ← list view, page 2
@@ -1969,6 +1982,19 @@
    * This avoids false positives from short label names, pagination tokens, etc.
    */
   function isListView() {
+    // Gmail's "Open in new window" route does not use the normal hash-based
+    // thread URL. Current Gmail uses /popout; older/alternate message-only
+    // routes use view=btop, view=pt, or view=om.
+    if (/\/popout\/?$/.test(location.pathname)) return false;
+
+    let standaloneView = "";
+    try {
+      standaloneView = new URLSearchParams(location.search).get("view") || "";
+    } catch (_) { /* fall through to hash detection */ }
+    if (standaloneView === "btop" || standaloneView === "pt" || standaloneView === "om") {
+      return false;
+    }
+
     let hash = location.hash;
     if (hash === "" || hash === "#" || hash === "#inbox") return true;
     if (/^#inbox\/p\d+$/.test(hash)) return true;
@@ -2071,6 +2097,11 @@
 
     container = document.createElement("div");
     container.className = "gmail-sort-container";
+    // Apply visibility synchronously so thread-only views never flash the
+    // toolbar while storage preferences are still loading.
+    if (!isListView() || isExcludedLabel()) {
+      container.classList.add("gmail-sort-hidden");
+    }
     container.setAttribute("role", "toolbar");
     container.setAttribute("aria-label", "InboxSort — email sorting and filtering");
     if (isDarkMode) container.classList.add("gmail-sort-dark");
@@ -2412,6 +2443,7 @@
         case "Digit4": applySort("senderZA", false); break;
         case "Digit5": applySort("unreadFirst", false); break;
         case "Digit6": toggleGroup(); break;
+        case "Digit7": applySort("starredFirst", false); break;
         case "Slash": toggleCheatSheet(); break;
         case "Digit0":
           clearFilters();

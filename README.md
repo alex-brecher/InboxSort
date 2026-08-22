@@ -1,6 +1,6 @@
 # InboxSort
 
-**A privacy-first Chrome extension that visually sorts and filters Gmail by date, sender, or unread status.**
+**A privacy-first Chrome extension that visually sorts and filters Gmail by date, sender, star, or unread status.**
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Add%20to%20Chrome-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/inboxsort/mmbbiejiidimjaceddigelomncimdegb)
 
@@ -21,6 +21,7 @@ Works visually using CSS transforms — your actual inbox is never modified.
 | **Sender A→Z** | Group conversations alphabetically by sender |
 | **Sender Z→A** | Reverse alphabetical order |
 | **Unread First** | Push unread messages to the top |
+| **Starred First** | Put starred messages first, then sort each group by newest date |
 
 ### Group by Sender
 
@@ -53,6 +54,7 @@ A slim bar below your sort tabs showing real-time counts: **total**, **unread**,
 | `Alt+4` | Sort: Sender Z→A |
 | `Alt+5` | Sort: Unread First |
 | `Alt+6` | Toggle Group by Sender |
+| `Alt+7` | Sort: Starred First |
 | `Alt+0` | Clear all active filters |
 | `/` | Focus the filter search bar |
 | `?` | Open keyboard shortcut cheat sheet |
@@ -130,7 +132,7 @@ InboxSort does **not** request `identity`, `cookies`, `history`, `bookmarks`, `d
 
 ## Version
 
-**v1.1.0** — See [CHANGELOG.md](CHANGELOG.md) for release history.
+**v1.2.1** — See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
 

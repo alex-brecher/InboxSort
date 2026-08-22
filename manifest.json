@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "InboxSort",
-  "version": "1.1.0",
-  "description": "Sort your Gmail inbox by date, sender, or unread status. Inline tabs, keyboard shortcuts, stats, and more.",
+  "version": "1.2.1",
+  "description": "Sort your Gmail inbox by date, sender, starred, or unread status. Inline tabs, keyboard shortcuts, stats, and more.",
   "permissions": ["activeTab", "storage"],
   "content_scripts": [
     {

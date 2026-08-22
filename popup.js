@@ -23,7 +23,8 @@ const VALID_SORT_MODES = {
   oldest: true,
   senderAZ: true,
   senderZA: true,
-  unreadFirst: true
+  unreadFirst: true,
+  starredFirst: true
 };
 
 function normalizeSortMode(mode) {
@@ -533,7 +534,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
       }
       // Only import known keys with type validation to prevent junk
       const VALID_SCHEMA = {
-        sortMode:     function (v) { return typeof v === "string" && ["newest","oldest","senderAZ","senderZA","unreadFirst"].indexOf(v) !== -1; },
+        sortMode:     function (v) { return typeof v === "string" && ["newest","oldest","senderAZ","senderZA","unreadFirst","starredFirst"].indexOf(v) !== -1; },
         groupEnabled: function (v) { return typeof v === "boolean"; },
         accentColor:  function (v) { return typeof v === "string" && ["blue","green","purple","red","orange","teal"].indexOf(v) !== -1; },
         autoSort:     function (v) { return typeof v === "boolean"; },
