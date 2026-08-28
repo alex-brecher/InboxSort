@@ -2,7 +2,7 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort — Content Script (v1.2.1)
+   *  InboxSort - Content Script (v1.2.2)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
    *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
@@ -162,6 +162,9 @@
 
     // MutationObserver debounce — batches rapid DOM changes into one handler call
     OBSERVER_DEBOUNCE: 250,
+    // Gmail can replace div[role="main"] without mutating the old node. A cheap
+    // watchdog reconnects the observer and restores the toolbar when that happens.
+    OBSERVER_WATCHDOG: 1500,
 
     // Search input debounce — waits for typing to pause before filtering
     SEARCH_DEBOUNCE: 150,
@@ -225,6 +228,8 @@
   let autoSortInterval    = null;
   let _groupStyleInterval = null; // Persistent group style re-apply
   let _observer           = null; // MutationObserver instance
+  let _observerRoot       = null; // Current Gmail main node observed for changes
+  let _observerWatchdog   = null; // Reconnects after Gmail replaces the main node
   let _observerDebounce   = null; // Observer debounce timer
   let _initWaitInterval   = null; // init() polling interval
   let _initSafetyTimeout  = null; // init() 30s failsafe timeout
@@ -242,6 +247,7 @@
   let _sortInProgress      = false; // Reentrancy guard for applySortTransforms
   let _resizeDebounce      = null;  // Debounce timer for viewport resize re-sort
   let _lastResizeWidth     = 0;     // Track viewport width to ignore height-only resizes
+  let _initialized         = false; // Prevent duplicate timers and observers
 
   // ── Current Gmail label ─────────────────────────────────────────
 
@@ -359,6 +365,7 @@
     if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
     if (_groupStyleInterval) { clearInterval(_groupStyleInterval); _groupStyleInterval = null; }
     if (_observerDebounce)   { clearTimeout(_observerDebounce);    _observerDebounce = null; }
+    if (_observerWatchdog)   { clearInterval(_observerWatchdog);   _observerWatchdog = null; }
     if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
     if (snoozeTimer)         { clearTimeout(snoozeTimer);          snoozeTimer = null; }
     if (snoozeTickTimer)     { clearInterval(snoozeTickTimer);     snoozeTickTimer = null; }
@@ -378,6 +385,7 @@
     stopGroupStyleInterval();
 
     if (_observer) { _observer.disconnect(); _observer = null; }
+    _observerRoot = null;
     document.removeEventListener("click", onDocumentClick, true);
     document.removeEventListener("mousedown", onDocumentMousedown, true);
     document.removeEventListener("input", onDocumentInput, false);
@@ -1607,7 +1615,7 @@
     ];
 
     let html = '<div class="gmail-sort-cheatsheet-title">' + ICONS.keyboard + ' Keyboard Shortcuts</div>' +
-               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.1') + ' — Made by Alex Brecher</div>';
+               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.2') + ' - Made by Alex Brecher</div>';
 
     for (let i = 0; i < shortcuts.length; i++) {
       let s = shortcuts[i];
@@ -2560,6 +2568,45 @@
 
   // ── MutationObserver ──────────────────────────────────────────────
 
+  function attachObserverToCurrentRoot() {
+    if (!_observer) return;
+    let nextRoot = document.querySelector('div[role="main"]') || document.body;
+    if (!nextRoot) return;
+    if (_observerRoot === nextRoot && nextRoot.isConnected) return;
+
+    _observer.disconnect();
+    _observer.observe(nextRoot, { childList: true, subtree: true });
+    _observerRoot = nextRoot;
+  }
+
+  function startObserverWatchdog() {
+    if (_observerWatchdog) clearInterval(_observerWatchdog);
+    _observerWatchdog = setInterval(function () {
+      if (!isExtensionContextValid()) {
+        handleContextInvalidated();
+        return;
+      }
+
+      let currentMain = document.querySelector('div[role="main"]');
+      if (currentMain && (_observerRoot !== currentMain || !_observerRoot || !_observerRoot.isConnected)) {
+        attachObserverToCurrentRoot();
+        fullInvalidateRowCache();
+        hasAutoSorted = false;
+      }
+
+      // Gmail occasionally rebuilds only the top action area. That can remove
+      // InboxSort without producing a mutation inside the observed main node.
+      if (!isButtonInjected()) {
+        injectButton();
+        if (isButtonInjected() && isListView() && (currentSort !== "newest" || groupEnabled)) {
+          autoSortWhenReady();
+        }
+      } else {
+        updateButtonVisibility();
+      }
+    }, CONFIG.OBSERVER_WATCHDOG);
+  }
+
   // Strip Gmail overlay params (compose, reply, forward, etc.) so
   // opening/closing Compose doesn't trigger a full sort reset.
   function stripGmailOverlayParams(url) {
@@ -2698,9 +2745,9 @@
     });
 
     // Prefer observing div[role="main"] to avoid firing on compose, sidebars,
-    // chat, etc.  Falls back to document.body if Gmail's layout hasn't loaded.
-    let observeRoot = document.querySelector('div[role="main"]') || document.body;
-    _observer.observe(observeRoot, { childList: true, subtree: true });
+    // chat, etc. The watchdog reattaches when Gmail replaces that root.
+    attachObserverToCurrentRoot();
+    startObserverWatchdog();
   }
 
   // ── Message listener (from popup) ─────────────────────────────────
@@ -2810,6 +2857,7 @@
     if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
     if (_groupStyleInterval) { clearInterval(_groupStyleInterval); _groupStyleInterval = null; }
     if (_observerDebounce)   { clearTimeout(_observerDebounce);    _observerDebounce = null; }
+    if (_observerWatchdog)   { clearInterval(_observerWatchdog);   _observerWatchdog = null; }
     if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
     if (_saveStateTimer)     { clearTimeout(_saveStateTimer);      _saveStateTimer = null; }
     _saveStatePending = false;
@@ -2818,6 +2866,7 @@
     if (snoozeTimer)         { clearTimeout(snoozeTimer);          snoozeTimer = null; }
     if (snoozeTickTimer)     { clearInterval(snoozeTickTimer);     snoozeTickTimer = null; }
     if (_observer)           { _observer.disconnect();             _observer = null; }
+    _observerRoot = null;
     if (_initWaitInterval)   { clearInterval(_initWaitInterval);   _initWaitInterval = null; }
     if (_initSafetyTimeout)  { clearTimeout(_initSafetyTimeout);   _initSafetyTimeout = null; }
     if (_waitForNewPage)     { clearInterval(_waitForNewPage);     _waitForNewPage = null; }
@@ -2863,6 +2912,8 @@
   // ── Initialisation ────────────────────────────────────────────────
 
   function init() {
+    if (_initialized) return;
+    _initialized = true;
     _initWaitInterval = setInterval(function () {
       if (document.querySelector('div[role="main"]')) {
         clearInterval(_initWaitInterval);

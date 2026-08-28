@@ -5,6 +5,14 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.2.2] -- 2026-08-28
+
+### Fixed
+- Restored the InboxSort toolbar after Gmail replaces its main view.
+- Restored the toolbar after Gmail rebuilds only its action area.
+- Reconnected the Gmail observer after inbox, thread, label, and chat transitions.
+- Prevented duplicate observers and stopped the recovery timer during extension cleanup.
+
 ## [1.2.1] -- 2026-08-22
 
 ### Fixed

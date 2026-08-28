@@ -40,4 +40,4 @@ Store Icon: icons/icon128.png (already generated)
 Privacy Policy URL: (host privacy-policy.html)
 Support URL: mailto:abrecher@gmail.com
 
-Version: 1.2.1
+Version: 1.2.2
