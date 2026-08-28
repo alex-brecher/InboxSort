@@ -132,7 +132,7 @@ InboxSort does **not** request `identity`, `cookies`, `history`, `bookmarks`, `d
 
 ## Version
 
-**v1.2.2** - See [CHANGELOG.md](CHANGELOG.md) for release history.
+**v1.2.3** - See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
 

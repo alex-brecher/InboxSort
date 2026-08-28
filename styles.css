@@ -1,5 +1,5 @@
 /* ================================================================
- *  InboxSort — Stylesheet (v1.0.0) — Made by Alex Brecher
+ *  InboxSort — Stylesheet (v1.2.3) — Made by Alex Brecher
  * ================================================================ */
 
 /* ── Accent colour defaults (set on :root, overridden by JS) ── */
@@ -24,6 +24,8 @@
   box-sizing: border-box !important;
   width: 100% !important;
   overflow: visible !important;
+  container-type: inline-size !important;
+  container-name: inboxsort-toolbar !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
   background: linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0)) !important;
 }
@@ -61,8 +63,6 @@
   position: relative !important;
   outline: none !important;
   box-shadow: none !important;
-}
-
   -webkit-appearance: none !important;
   appearance: none !important;
   flex-shrink: 0 !important;
@@ -72,7 +72,7 @@
   vertical-align: baseline !important;
 }
 
-.inboxsort-tab:focus-visible {
+.gmail-sort-tab:focus-visible {
   outline: 2px solid var(--sort-accent, #1a73e8) !important;
   outline-offset: -2px !important;
 }
@@ -919,6 +919,34 @@ html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start.gma
 /* ================================================================
  *  Responsive Design — Graceful degradation on narrow viewports
  * ================================================================ */
+
+/* Gmail's navigation rail reduces the message pane without reducing the
+   browser viewport. Container queries keep the toolbar responsive to the
+   space Gmail actually gives it. */
+@container inboxsort-toolbar (max-width: 950px) {
+  .gmail-sort-stat-sep {
+    display: none !important;
+  }
+  .gmail-sort-stat {
+    font-size: 0 !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+  .gmail-sort-search-wrap {
+    min-width: 90px !important;
+  }
+}
+
+@container inboxsort-toolbar (max-width: 760px) {
+  .gmail-sort-tab-label {
+    display: none !important;
+  }
+  .gmail-sort-tab {
+    padding: 0 8px !important;
+    min-width: 28px !important;
+    justify-content: center !important;
+  }
+}
 
 /* Medium screens: hide tab labels, show icons only */
 @media (max-width: 900px) {

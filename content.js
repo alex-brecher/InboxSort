@@ -2,7 +2,7 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort - Content Script (v1.2.2)
+   *  InboxSort - Content Script (v1.2.3)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
    *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
@@ -1615,7 +1615,7 @@
     ];
 
     let html = '<div class="gmail-sort-cheatsheet-title">' + ICONS.keyboard + ' Keyboard Shortcuts</div>' +
-               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.2') + ' - Made by Alex Brecher</div>';
+               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.3') + ' - Made by Alex Brecher</div>';
 
     for (let i = 0; i < shortcuts.length; i++) {
       let s = shortcuts[i];

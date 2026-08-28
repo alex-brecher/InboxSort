@@ -5,6 +5,14 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.2.3] -- 2026-08-28
+
+### Fixed
+- Kept the filter field visible when the Gmail navigation panel reduces the message-list width.
+- Made the toolbar respond to its available width instead of the full browser width.
+- Restored the button reset rules that Gmail styles could override.
+- Restored the visible keyboard-focus outline on sort buttons.
+
 ## [1.2.2] -- 2026-08-28
 
 ### Fixed

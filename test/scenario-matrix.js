@@ -2,7 +2,9 @@ const fs = require("node:fs");
 const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 
-const source = fs.readFileSync(require("node:path").join(__dirname, "..", "content.js"), "utf8");
+const root = require("node:path").join(__dirname, "..");
+const source = fs.readFileSync(require("node:path").join(root, "content.js"), "utf8");
+const styles = fs.readFileSync(require("node:path").join(root, "styles.css"), "utf8");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,7 +67,7 @@ function makeChrome(window, state) {
     runtime: {
       id: "inboxsort-matrix",
       lastError: null,
-      getManifest: () => ({ version: "1.2.2" }),
+      getManifest: () => ({ version: "1.2.3" }),
       onMessage: { addListener() {} }
     },
     storage: {
@@ -134,6 +136,12 @@ async function run() {
   assert.equal(doc.querySelectorAll(".gmail-sort-container").length, 1);
   assert.equal(doc.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), false);
   pass("inbox toolbar injection");
+
+  assert.match(styles, /container-name:\s*inboxsort-toolbar/);
+  assert.match(styles, /@container inboxsort-toolbar \(max-width: 950px\)/);
+  assert.match(styles, /\.gmail-sort-tab:focus-visible/);
+  assert.doesNotMatch(styles, /\.inboxsort-tab:focus-visible/);
+  pass("responsive toolbar and keyboard focus CSS");
 
   doc.querySelector('[data-tab-group="starred"]').click();
   await wait(260);

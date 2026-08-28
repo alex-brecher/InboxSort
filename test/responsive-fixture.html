@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>InboxSort responsive fixture</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    .mail-pane { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <main class="mail-pane" data-width="901" style="width: 901px">
+    <div class="gmail-sort-container">
+      <button class="gmail-sort-tab"><span class="gmail-sort-tab-icon">↓</span><span class="gmail-sort-tab-label">Date</span></button>
+      <button class="gmail-sort-tab"><span class="gmail-sort-tab-icon">≡</span><span class="gmail-sort-tab-label">Sender</span></button>
+      <button class="gmail-sort-tab"><span class="gmail-sort-tab-icon">✉</span><span class="gmail-sort-tab-label">Unread</span></button>
+      <button class="gmail-sort-tab gmail-sort-tab-active"><span class="gmail-sort-tab-icon">☆</span><span class="gmail-sort-tab-label">Starred</span></button>
+      <button class="gmail-sort-tab"><span class="gmail-sort-tab-icon">≡</span><span class="gmail-sort-tab-label">Group</span></button>
+      <span class="gmail-sort-divider"></span>
+      <span class="gmail-sort-stats">
+        <span class="gmail-sort-stat"><span class="gmail-sort-stat-num">25</span> emails</span>
+        <span class="gmail-sort-stat-sep">·</span>
+        <span class="gmail-sort-stat"><span class="gmail-sort-stat-icon">✉</span><span class="gmail-sort-stat-num">13</span> unread</span>
+        <span class="gmail-sort-stat-sep">·</span>
+        <span class="gmail-sort-stat"><span class="gmail-sort-stat-icon">☆</span><span class="gmail-sort-stat-num">3</span> starred</span>
+        <span class="gmail-sort-stat-sep">·</span>
+        <span class="gmail-sort-stat"><span class="gmail-sort-stat-icon">⌕</span><span class="gmail-sort-stat-num">11</span> attachments</span>
+      </span>
+      <span class="gmail-sort-search-wrap">
+        <span class="gmail-sort-search-icon">⌕</span>
+        <input class="gmail-sort-search-input" placeholder="Filter emails">
+      </span>
+    </div>
+  </main>
+  <script>
+    const template = document.querySelector(".mail-pane");
+    for (const width of [760, 600, 480]) {
+      const pane = template.cloneNode(true);
+      pane.dataset.width = String(width);
+      pane.style.width = width + "px";
+      document.body.appendChild(pane);
+    }
+  </script>
+</body>
+</html>
