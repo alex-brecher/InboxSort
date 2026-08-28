@@ -1,0 +1,11 @@
+{
+  "name": "inboxsort",
+  "version": "1.2.2",
+  "private": true,
+  "scripts": {
+    "test": "node test/scenario-matrix.js"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}
