@@ -1,6 +1,6 @@
-InboxSort: Sort your inbox your way
+InboxSort: Sort Gmail your way
 
-Sort Gmail by date, sender, starred status, or unread status. InboxSort adds sorting, filters, search, and message counts inside Gmail.
+Sort Gmail by date, sender, starred status, or unread status. InboxSort adds a compact toolbar and a clear settings popup to Gmail.
 
 FEATURES:
 
@@ -42,23 +42,26 @@ Settings:
 • Remember sort preference per label
 • Snooze sorting temporarily (15m, 30m, 1h)
 • 6 accent colors to match your style
-• Settings sync across devices via your Google account
+• Choose which toolbar controls appear
+• Export and import your settings
+• Sort and group changes stay in sync across open Gmail tabs
+• Chrome sync stores your preferences across signed-in browsers
 
 WHY INBOXSORT?
 
 • Uses a toolbar that matches Gmail
 • Uses CSS transforms for fast visual sorting
 • Keeps your data in your browser and does not use tracking
-• Works on all Gmail views and labels
-• Settings sync across all your Chrome browsers
+• Works in Inbox, categories, search results, and custom labels
 • Dark mode support
 • Fast and responsive
+• Keyboard-accessible controls and reduced-motion support
 
 OPEN SOURCE:
 • Review the source code or report an issue at https://github.com/alex-brecher/InboxSort
 
 PERMISSIONS:
-• activeTab: Required to read and sort your email list
-• storage: Required to save and sync your sort preferences
+• activeTab: Runs InboxSort in the active Gmail tab
+• storage: Saves and syncs your InboxSort preferences
 
-This extension does not collect, transmit, or store any personal data. All processing happens locally in your browser.
+InboxSort does not collect or transmit personal data. InboxSort processes the visible message list in your browser.

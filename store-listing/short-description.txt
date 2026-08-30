@@ -1,1 +1,1 @@
-Sort Gmail by date, sender, star, or unread status. Group by sender, filter messages, search, and view inbox stats.
+Sort Gmail by date, sender, starred status, or unread status. Group senders, filter messages, search, and view inbox counts.

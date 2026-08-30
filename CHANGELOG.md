@@ -5,6 +5,31 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.3.1] -- 2026-08-30
+
+### Added
+- Added a redesigned popup with direct sort controls, clear settings, and keyboard access.
+- Added live status text that shows when Gmail is ready, needs a refresh, or is not open.
+- Added tests for the popup, accessibility states, read messages, 24-hour times, multiple tabs, and pause recovery.
+
+### Changed
+- Replaced decorative gradients and elastic motion with a restrained interface that matches Gmail.
+- Improved text contrast, focus indicators, dark mode, and reduced-motion support.
+- Changed the reset control to require two clicks.
+- Matched toolbar visibility settings to the five controls in the Gmail toolbar.
+
+### Fixed
+- Fixed sender sorting for read messages that use Gmail's `.yP` sender element.
+- Fixed sender sorting for multi-participant conversations that include nested Gmail sender elements.
+- Placed messages without a sender after named senders in both sender sort directions.
+- Preserved a paused sort after Gmail reloads.
+- Synchronized sort, group, pause, and resume changes across open Gmail tabs.
+- Prevented a delayed settings write from replacing the sort that must return after a pause.
+- Added support for 24-hour Gmail time values.
+- Changed stats filters to keyboard-accessible buttons with correct state labels.
+- Fixed the popup status for non-Gmail tabs.
+- Made Reset all settings clear a saved pause timer when Gmail is not open.
+
 ## [1.2.3] -- 2026-08-28
 
 ### Fixed

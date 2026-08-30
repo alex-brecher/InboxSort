@@ -2,7 +2,7 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort - Content Script (v1.2.3)
+   *  InboxSort - Content Script (v1.3.1)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
    *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
@@ -80,7 +80,18 @@
   }
 
   function normalizeHiddenTabs(value) {
-    return (value && typeof value === "object" && !Array.isArray(value)) ? value : {};
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    let normalized = {};
+    let allowed = ["date", "sender", "unread", "starred", "groupSender"];
+    for (let i = 0; i < allowed.length; i++) {
+      if (value[allowed[i]] === true) normalized[allowed[i]] = true;
+    }
+    // Migrate the pre-1.3 per-mode preferences to the merged toolbar controls.
+    if (value.oldest === true && value.newest === true) normalized.date = true;
+    if (value.senderAZ === true && value.senderZA === true) normalized.sender = true;
+    if (value.unreadFirst === true) normalized.unread = true;
+    if (value.starredFirst === true) normalized.starred = true;
+    return normalized;
   }
 
   // Tab groups: merge related sort modes into single toggle buttons.
@@ -97,12 +108,12 @@
   // ── Accent colour palette ──────────────────────────────────────────
 
   const ACCENT_COLORS = {
-    blue:   { primary: "#1a73e8", hover: "#1765cc", light: "#d2e3fc", dark: "#174ea6" },
-    green:  { primary: "#1e8e3e", hover: "#188038", light: "#ceead6", dark: "#137333" },
-    purple: { primary: "#9334e6", hover: "#7627bb", light: "#e8d0fe", dark: "#5c16a5" },
-    red:    { primary: "#d93025", hover: "#c5221f", light: "#f4c7c3", dark: "#a50e0e" },
-    orange: { primary: "#e8710a", hover: "#d56e0c", light: "#fde293", dark: "#b06000" },
-    teal:   { primary: "#007b83", hover: "#006d75", light: "#b2ebf2", dark: "#005f66" }
+    blue:   { primary: "#1a73e8", hover: "#1765cc", ink: "#174ea6", light: "#d2e3fc" },
+    green:  { primary: "#1e8e3e", hover: "#188038", ink: "#137333", light: "#ceead6" },
+    purple: { primary: "#8430ce", hover: "#7627bb", ink: "#5c16a5", light: "#e8d0fe" },
+    red:    { primary: "#c5221f", hover: "#b31412", ink: "#a50e0e", light: "#f4c7c3" },
+    orange: { primary: "#b85d00", hover: "#a65300", ink: "#8d4900", light: "#fde293" },
+    teal:   { primary: "#007b83", hover: "#006d75", ink: "#005f66", light: "#b2ebf2" }
   };
 
   // Dark mode accent variants — softer, higher-contrast colors for dark backgrounds
@@ -193,6 +204,7 @@
   let container        = null;    // Toolbar DOM element
   let statsBar         = null;    // Stats bar DOM element
   let cheatsheetEl     = null;    // Keyboard shortcut overlay
+  let _cheatsheetReturnFocus = null;
   let accentColor      = "blue";
   let isDarkMode       = false;
   let hiddenTabs       = {};
@@ -348,6 +360,7 @@
     root.removeProperty("--sort-accent");
     root.removeProperty("--sort-accent-hover");
     root.removeProperty("--sort-accent-light");
+    root.removeProperty("--sort-accent-ink");
     document.documentElement.classList.remove("gmail-sort-dark-mode");
   }
 
@@ -469,7 +482,11 @@
 
     _saveStatePending = false;
     _saveStateInFlight = true;
-    let data = { accentColor: accentColor, sortMode: currentSort, groupEnabled: groupEnabled };
+    // While paused, currentSort and groupEnabled intentionally hold Gmail's
+    // default visual state. Persist the state that must return after resume.
+    let persistedSort = isSnoozedActive() ? (snoozedSort || "newest") : currentSort;
+    let persistedGroup = isSnoozedActive() ? !!snoozedGroup : groupEnabled;
+    let data = { accentColor: accentColor, sortMode: persistedSort, groupEnabled: persistedGroup };
 
     if (perLabelEnabled) {
       // Per-label prefs need a read-modify-write pass.
@@ -494,7 +511,7 @@
             return;
           }
           let prefs = stored && stored.labelPrefs && typeof stored.labelPrefs === "object" ? stored.labelPrefs : {};
-          prefs[getCurrentLabel()] = currentSort;
+          prefs[getCurrentLabel()] = persistedSort;
           data.labelPrefs = prefs;
           persistStateSnapshot(data);
         });
@@ -521,6 +538,50 @@
     if (!isExtensionContextValid()) { handleContextInvalidated(); return; }
     _saveStatePending = true;
     scheduleSaveState(CONFIG.SAVE_STATE_DEBOUNCE);
+  }
+
+  function persistSnoozeState(value) {
+    if (!isExtensionContextValid() || !chrome.storage || !chrome.storage.local) return;
+    try {
+      chrome.storage.local.set({ snoozeState: value || null }, function () {
+        if (!isExtensionContextValid()) handleContextInvalidated();
+      });
+    } catch (e) {
+      if (isContextInvalidatedError(e)) handleContextInvalidated();
+    }
+  }
+
+  function restorePersistedSnooze(callback) {
+    if (!chrome.storage || !chrome.storage.local) {
+      callback();
+      return;
+    }
+    try {
+      chrome.storage.local.get({ snoozeState: null }, function (localData) {
+        if (hasRuntimeLastError() || !isExtensionContextValid()) {
+          if (!isExtensionContextValid()) handleContextInvalidated();
+          callback();
+          return;
+        }
+        let state = localData && localData.snoozeState;
+        let endTime = state && Number(state.endTime);
+        if (!state || !isFinite(endTime) || endTime <= Date.now()) {
+          if (state) persistSnoozeState(null);
+          callback();
+          return;
+        }
+        snoozedSort = normalizeSortMode(state.sortMode || currentSort);
+        snoozedGroup = !!state.groupEnabled;
+        snoozeEndTime = endTime;
+        currentSort = "newest";
+        groupEnabled = false;
+        startSnoozeTimers(endTime - Date.now());
+        callback();
+      });
+    } catch (e) {
+      if (isContextInvalidatedError(e)) handleContextInvalidated();
+      callback();
+    }
   }
 
   function loadState(callback) {
@@ -557,7 +618,7 @@
           groupEnabled = true;
         }
         currentSort = normalizeSortMode(loadedSort);
-        callback();
+        restorePersistedSnooze(callback);
       });
     } catch (e) {
       if (isContextInvalidatedError(e) || !isExtensionContextValid()) {
@@ -570,8 +631,45 @@
   }
 
   chrome.storage.onChanged.addListener(function (changes, areaName) {
-    if (areaName !== "sync") return;
     if (_contextInvalid) return;
+
+    // Pause state is stored locally, so mirror it across every open Gmail tab.
+    // The tab that originated the change already has matching state and exits
+    // through the equality guards below.
+    if (areaName === "local") {
+      if (!changes.snoozeState) return;
+      let nextSnooze = changes.snoozeState.newValue;
+      let nextEnd = nextSnooze && Number(nextSnooze.endTime);
+      if (nextSnooze && isFinite(nextEnd) && nextEnd > Date.now()) {
+        if (snoozeEndTime === nextEnd && snoozedSort !== null) return;
+        snoozedSort = normalizeSortMode(nextSnooze.sortMode || currentSort);
+        snoozedGroup = !!nextSnooze.groupEnabled;
+        snoozeEndTime = nextEnd;
+        clearSortTransforms();
+        currentSort = "newest";
+        groupEnabled = false;
+        startSnoozeTimers(nextEnd - Date.now());
+        refreshUI();
+        updateStats();
+        return;
+      }
+
+      if (snoozedSort !== null || snoozedGroup || snoozeEndTime || snoozeTimer || snoozeTickTimer) {
+        let restoreSort = snoozedSort || "newest";
+        let restoreGroup = !!snoozedGroup;
+        if (snoozeTimer) { clearTimeout(snoozeTimer); snoozeTimer = null; }
+        if (snoozeTickTimer) { clearInterval(snoozeTickTimer); snoozeTickTimer = null; }
+        snoozedSort = null;
+        snoozedGroup = false;
+        snoozeEndTime = 0;
+        groupEnabled = restoreGroup;
+        applySort(restoreSort, true);
+      }
+      return;
+    }
+
+    if (areaName !== "sync") return;
+    let sortStateChanged = false;
     if (changes.accentColor) {
       accentColor = changes.accentColor.newValue;
       applyAccentColor();
@@ -585,6 +683,52 @@
     if (changes.hiddenTabs) {
       hiddenTabs = normalizeHiddenTabs(changes.hiddenTabs.newValue);
       applyHiddenTabs();
+    }
+
+    // Sync sort and grouping changes across open Gmail tabs. The originating
+    // tab already holds these values, so the equality checks prevent loops.
+    if (changes.groupEnabled && typeof changes.groupEnabled.newValue === "boolean" && isSnoozedActive()) {
+      snoozedGroup = changes.groupEnabled.newValue;
+    } else if (changes.groupEnabled && typeof changes.groupEnabled.newValue === "boolean") {
+      let nextGroup = changes.groupEnabled.newValue;
+      if (nextGroup !== groupEnabled) {
+        groupEnabled = nextGroup;
+        sortStateChanged = true;
+      }
+    }
+
+    if (!perLabelEnabled && changes.sortMode && isSnoozedActive()) {
+      snoozedSort = normalizeSortMode(changes.sortMode.newValue);
+    } else if (!perLabelEnabled && changes.sortMode) {
+      let nextSort = normalizeSortMode(changes.sortMode.newValue);
+      if (nextSort !== currentSort) {
+        currentSort = nextSort;
+        sortStateChanged = true;
+      }
+    } else if (perLabelEnabled && changes.labelPrefs) {
+      let nextPrefs = changes.labelPrefs.newValue;
+      let labelMode = nextPrefs && nextPrefs[getCurrentLabel()];
+      if (labelMode && isSnoozedActive()) {
+        snoozedSort = normalizeSortMode(labelMode);
+      } else if (labelMode) {
+        let nextLabelSort = normalizeSortMode(labelMode);
+        if (nextLabelSort !== currentSort) {
+          currentSort = nextLabelSort;
+          sortStateChanged = true;
+        }
+      }
+    }
+
+    if (changes.perLabel) {
+      loadState(function () {
+        if (container && isListView() && !isExcludedLabel() && !isSnoozedActive()) {
+          applySort(currentSort, true);
+        } else {
+          refreshUI();
+        }
+      });
+    } else if (sortStateChanged && container && isListView() && !isExcludedLabel() && !isSnoozedActive()) {
+      applySort(currentSort, true);
     }
   });
 
@@ -691,6 +835,7 @@
     root.setProperty("--sort-accent", use.primary);
     root.setProperty("--sort-accent-hover", use.hover);
     root.setProperty("--sort-accent-light", use.light || c.light);
+    root.setProperty("--sort-accent-ink", isDarkMode ? use.primary : c.ink);
   }
 
   // ── Date parsing ──────────────────────────────────────────────────
@@ -717,6 +862,17 @@
       d = new Date(new Date().toDateString() + " " + cleaned);
       if (!isNaN(d.getTime())) return d;
     }
+
+    let time24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+    if (time24) {
+      let hours = parseInt(time24[1], 10);
+      let minutes = parseInt(time24[2], 10);
+      if (hours <= 23 && minutes <= 59) {
+        d = new Date();
+        d.setHours(hours, minutes, 0, 0);
+        return d;
+      }
+    }
     return null;
   }
 
@@ -732,8 +888,15 @@
   }
 
   function getSenderFromRow(row) {
-    let el = row.querySelector("span.zF") || row.querySelector("span.bA4");
-    return el ? el.textContent.trim().toLowerCase() : "";
+    // Gmail uses .bA4 for the complete visible sender or participant label.
+    // Its nested .zF and .yP elements can represent only one participant.
+    let el = row.querySelector("span.bA4") ||
+             row.querySelector("span.zF") ||
+             row.querySelector("span.yP") ||
+             row.querySelector("[data-hovercard-id]");
+    if (!el) return "";
+    let sender = (el.getAttribute("name") || el.textContent || el.getAttribute("data-hovercard-id") || "").trim();
+    return sender.toLocaleLowerCase();
   }
 
   function isUnread(row) {
@@ -905,8 +1068,18 @@
       if (!b.date) return -1;
       return b.date.getTime() - a.date.getTime();
     },
-    senderAZ: function (a, b) { return a.sender.localeCompare(b.sender); },
-    senderZA: function (a, b) { return b.sender.localeCompare(a.sender); },
+    senderAZ: function (a, b) {
+      if (!a.sender && !b.sender) return 0;
+      if (!a.sender) return 1;
+      if (!b.sender) return -1;
+      return a.sender.localeCompare(b.sender);
+    },
+    senderZA: function (a, b) {
+      if (!a.sender && !b.sender) return 0;
+      if (!a.sender) return 1;
+      if (!b.sender) return -1;
+      return b.sender.localeCompare(a.sender);
+    },
     unreadFirst: function (a, b) {
       if (a.unread !== b.unread) return a.unread ? -1 : 1;
       if (!a.date && !b.date) return 0;
@@ -932,6 +1105,9 @@
   // reverseGroups: when true, groups are sorted Z→A (used for senderZA mode).
   function wrapWithGroupSort(innerComparator, reverseGroups) {
     return function (a, b) {
+      if (!a.sender && !b.sender) return innerComparator(a, b);
+      if (!a.sender) return 1;
+      if (!b.sender) return -1;
       let cmp = a.sender.localeCompare(b.sender);
       if (reverseGroups) cmp = -cmp;
       if (cmp !== 0) return cmp;
@@ -1402,6 +1578,8 @@
   function createStatsBar() {
     statsBar = document.createElement("div");
     statsBar.className = "gmail-sort-stats";
+    statsBar.setAttribute("role", "group");
+    statsBar.setAttribute("aria-label", "Inbox message counts and quick filters");
     if (isDarkMode) statsBar.classList.add("gmail-sort-dark");
     return statsBar;
   }
@@ -1455,25 +1633,25 @@
       '<span class="gmail-sort-stat-num">' + total + '</span> email' + (total !== 1 ? 's' : '') + '</span>'
     );
     parts.push(
-      '<span class="gmail-sort-stat gmail-sort-stat-clickable' +
+      '<button type="button" class="gmail-sort-stat gmail-sort-stat-clickable' +
       (filterUnread ? ' gmail-sort-stat-active' : '') +
-      '" data-stat="unread" title="Toggle unread filter">' +
+      '" data-stat="unread" aria-pressed="' + (filterUnread ? 'true' : 'false') + '" title="Toggle unread filter">' +
       '<span class="gmail-sort-stat-icon">' + ICONS.unreadFirst + '</span>' +
-      '<span class="gmail-sort-stat-num">' + unreadCount + '</span> unread</span>'
+      '<span class="gmail-sort-stat-num">' + unreadCount + '</span> unread</button>'
     );
     parts.push(
-      '<span class="gmail-sort-stat gmail-sort-stat-clickable' +
+      '<button type="button" class="gmail-sort-stat gmail-sort-stat-clickable' +
       (filterStarred ? ' gmail-sort-stat-active' : '') +
-      '" data-stat="starred" title="Toggle starred filter">' +
+      '" data-stat="starred" aria-pressed="' + (filterStarred ? 'true' : 'false') + '" title="Toggle starred filter">' +
       '<span class="gmail-sort-stat-icon">' + ICONS.starred + '</span>' +
-      '<span class="gmail-sort-stat-num">' + starredCount + '</span> starred</span>'
+      '<span class="gmail-sort-stat-num">' + starredCount + '</span> starred</button>'
     );
     parts.push(
-      '<span class="gmail-sort-stat gmail-sort-stat-clickable' +
+      '<button type="button" class="gmail-sort-stat gmail-sort-stat-clickable' +
       (filterAttachment ? ' gmail-sort-stat-active' : '') +
-      '" data-stat="attachment" title="Toggle attachment filter">' +
+      '" data-stat="attachment" aria-pressed="' + (filterAttachment ? 'true' : 'false') + '" title="Toggle attachment filter">' +
       '<span class="gmail-sort-stat-icon">' + ICONS.attachment + '</span>' +
-      '<span class="gmail-sort-stat-num">' + attachCount + '</span> attachment' + (attachCount !== 1 ? 's' : '') + '</span>'
+      '<span class="gmail-sort-stat-num">' + attachCount + '</span> attachment' + (attachCount !== 1 ? 's' : '') + '</button>'
     );
 
     // Build stats HTML — join stat items with dot separators
@@ -1483,7 +1661,7 @@
     if (anyFilter) {
       let allSelected = visCount > 0 && selCount === visCount;
       html +=
-        '<button class="gmail-sort-bulk-select' + (allSelected ? ' gmail-sort-bulk-deselect' : '') +
+        '<button type="button" class="gmail-sort-bulk-select' + (allSelected ? ' gmail-sort-bulk-deselect' : '') +
         '" data-action="bulk-select" title="' + (allSelected ? 'Deselect all visible emails' : 'Select all visible emails') + '">' +
         ICONS.selectAll + (allSelected ? ' Deselect all' : ' Select visible') + '</button>';
     }
@@ -1499,6 +1677,9 @@
     if (unreadEl) unreadEl.classList.toggle("gmail-sort-stat-active", filterUnread);
     if (starredEl) starredEl.classList.toggle("gmail-sort-stat-active", filterStarred);
     if (attachEl) attachEl.classList.toggle("gmail-sort-stat-active", filterAttachment);
+    if (unreadEl) unreadEl.setAttribute("aria-pressed", filterUnread ? "true" : "false");
+    if (starredEl) starredEl.setAttribute("aria-pressed", filterStarred ? "true" : "false");
+    if (attachEl) attachEl.setAttribute("aria-pressed", filterAttachment ? "true" : "false");
   }
 
   // ── Pagination helpers ────────────────────────────────────────────
@@ -1585,8 +1766,14 @@
 
   function toggleCheatSheet() {
     if (cheatsheetEl && cheatsheetEl.isConnected) {
+      let returnFocus = _cheatsheetReturnFocus;
       cheatsheetEl.classList.remove("gmail-sort-cheatsheet-visible");
-      setTimeout(function () { if (cheatsheetEl && cheatsheetEl.parentNode) cheatsheetEl.remove(); cheatsheetEl = null; }, CONFIG.CHEATSHEET_FADE);
+      setTimeout(function () {
+        if (cheatsheetEl && cheatsheetEl.parentNode) cheatsheetEl.remove();
+        cheatsheetEl = null;
+        _cheatsheetReturnFocus = null;
+        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === "function") returnFocus.focus();
+      }, CONFIG.CHEATSHEET_FADE);
       return;
     }
 
@@ -1596,6 +1783,10 @@
 
     let panel = document.createElement("div");
     panel.className = "gmail-sort-cheatsheet";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-label", "InboxSort keyboard shortcuts");
+    panel.tabIndex = -1;
 
     let shortcuts = [
       { section: "Sort Modes" },
@@ -1615,7 +1806,7 @@
     ];
 
     let html = '<div class="gmail-sort-cheatsheet-title">' + ICONS.keyboard + ' Keyboard Shortcuts</div>' +
-               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.2.3') + ' - Made by Alex Brecher</div>';
+               '<div class="gmail-sort-cheatsheet-subtitle">InboxSort v' + (chrome.runtime.getManifest().version || '1.3.1') + ' - Made by Alex Brecher</div>';
 
     for (let i = 0; i < shortcuts.length; i++) {
       let s = shortcuts[i];
@@ -1631,9 +1822,11 @@
     backdrop.appendChild(panel);
     document.body.appendChild(backdrop);
     cheatsheetEl = backdrop;
+    _cheatsheetReturnFocus = document.activeElement;
 
     requestAnimationFrame(function () {
       backdrop.classList.add("gmail-sort-cheatsheet-visible");
+      panel.focus();
     });
 
     // Click backdrop to close
@@ -1820,6 +2013,22 @@
     return !!(snoozeTimer && snoozeEndTime > Date.now());
   }
 
+  function startSnoozeTimers(remainingMs) {
+    if (snoozeTimer) clearTimeout(snoozeTimer);
+    if (snoozeTickTimer) clearInterval(snoozeTickTimer);
+    snoozeTimer = setTimeout(function () {
+      cancelSnooze(true);
+      showNotification("Sorting resumed");
+    }, Math.max(1, remainingMs));
+    snoozeTickTimer = setInterval(function () {
+      updateStats();
+      if (!isSnoozedActive()) {
+        clearInterval(snoozeTickTimer);
+        snoozeTickTimer = null;
+      }
+    }, CONFIG.SNOOZE_TICK_INTERVAL);
+  }
+
   function toggleGroup() {
     // Manual group changes should end snooze immediately.
     if (isSnoozedActive()) cancelSnooze(false);
@@ -1858,6 +2067,11 @@
     snoozedSort = currentSort;
     snoozedGroup = groupEnabled;
     snoozeEndTime = Date.now() + minutes * 60000;
+    persistSnoozeState({
+      endTime: snoozeEndTime,
+      sortMode: snoozedSort,
+      groupEnabled: snoozedGroup
+    });
 
     // Revert to default visually, but do NOT save "newest" to storage
     clearSortTransforms();
@@ -1866,20 +2080,7 @@
     refreshUI();
     showNotification("Sorting paused for " + minutes + " min");
 
-    // Set timer to restore sort
-    snoozeTimer = setTimeout(function () {
-      cancelSnooze(true);
-      showNotification("Sorting resumed");
-    }, minutes * 60000);
-
-    // Tick timer to update the snooze badge periodically
-    snoozeTickTimer = setInterval(function () {
-      updateStats();
-      if (!isSnoozedActive()) {
-        clearInterval(snoozeTickTimer);
-        snoozeTickTimer = null;
-      }
-    }, CONFIG.SNOOZE_TICK_INTERVAL);
+    startSnoozeTimers(minutes * 60000);
 
     updateStats();
   }
@@ -1894,6 +2095,7 @@
     snoozedSort = null;
     snoozedGroup = false;
     snoozeEndTime = 0;
+    persistSnoozeState(null);
 
     if (restoreSortState && hadSnooze) {
       groupEnabled = restoreGroup;
@@ -1927,6 +2129,8 @@
         if (modeObj) {
           if (iconEl) iconEl.innerHTML = ICONS[modeObj.icon];
           if (labelEl) labelEl.textContent = modeObj.tabLabel;
+          tabs[i].setAttribute("aria-label", modeObj.label + ". Activate to return to newest.");
+          tabs[i].setAttribute("title", modeObj.label + ". Click to return to newest.");
         }
       } else {
         let tgId = tabs[i].getAttribute("data-tab-group");
@@ -1934,6 +2138,8 @@
           if (TAB_GROUPS[tgi].id === tgId) {
             if (iconEl) iconEl.innerHTML = ICONS[TAB_GROUPS[tgi].defaultIcon];
             if (labelEl) labelEl.textContent = TAB_GROUPS[tgi].defaultLabel;
+            tabs[i].setAttribute("aria-label", "Sort by " + TAB_GROUPS[tgi].defaultLabel);
+            tabs[i].setAttribute("title", "Sort by " + TAB_GROUPS[tgi].defaultLabel);
             break;
           }
         }
@@ -1945,6 +2151,8 @@
     if (groupBtn) {
       groupBtn.classList.toggle("gmail-sort-tab-active", groupEnabled);
       groupBtn.setAttribute("aria-pressed", groupEnabled ? "true" : "false");
+      groupBtn.setAttribute("title", groupEnabled ? "Turn off sender grouping" : "Group emails by sender");
+      groupBtn.setAttribute("aria-label", groupEnabled ? "Turn off sender grouping" : "Group emails by sender");
     }
   }
 
@@ -2068,13 +2276,7 @@
         continue;
       }
       let tabGroup = tabs[i].getAttribute("data-tab-group");
-      let modes = (tabs[i].getAttribute("data-modes") || "").split(",");
-      // Hide if ALL modes in the group are hidden
-      let allHidden = modes.length > 0;
-      for (let m = 0; m < modes.length; m++) {
-        if (!hiddenTabs[modes[m]]) { allHidden = false; break; }
-      }
-      if (tabGroup && allHidden) {
+      if (tabGroup && hiddenTabs[tabGroup]) {
         tabs[i].style.setProperty("display", "none", "important");
       } else {
         tabs[i].style.removeProperty("display");
@@ -2111,7 +2313,7 @@
       container.classList.add("gmail-sort-hidden");
     }
     container.setAttribute("role", "toolbar");
-    container.setAttribute("aria-label", "InboxSort — email sorting and filtering");
+    container.setAttribute("aria-label", "InboxSort email sorting and filtering");
     if (isDarkMode) container.classList.add("gmail-sort-dark");
 
     // ─ Sort tabs (merged toggles) ─
@@ -2123,6 +2325,7 @@
       tab.setAttribute("data-tab-group", tg.id);
       tab.setAttribute("data-modes", tg.modes.join(","));
       tab.setAttribute("aria-label", "Sort by " + tg.defaultLabel);
+      tab.setAttribute("aria-pressed", "false");
       tab.setAttribute("title", "Sort by " + tg.defaultLabel);
       tab.innerHTML =
         '<span class="gmail-sort-tab-icon">' + ICONS[tg.defaultIcon] + "</span>" +
@@ -2135,6 +2338,7 @@
     groupBtn.className = "gmail-sort-tab gmail-sort-group-toggle";
     groupBtn.type = "button";
     groupBtn.setAttribute("aria-label", "Group emails by sender");
+    groupBtn.setAttribute("aria-pressed", "false");
     groupBtn.setAttribute("title", "Group emails by sender");
     groupBtn.innerHTML =
       '<span class="gmail-sort-tab-icon">' + ICONS.groupSender + "</span>" +
@@ -2150,6 +2354,7 @@
 
     let searchIcon = document.createElement("span");
     searchIcon.className = "gmail-sort-search-icon";
+    searchIcon.setAttribute("aria-hidden", "true");
     searchIcon.innerHTML = ICONS.search;
     searchWrap.appendChild(searchIcon);
 
@@ -2164,6 +2369,8 @@
 
     let searchCount = document.createElement("span");
     searchCount.className = "gmail-sort-search-count";
+    searchCount.setAttribute("aria-live", "polite");
+    searchCount.setAttribute("aria-atomic", "true");
     searchWrap.appendChild(searchCount);
 
     let searchClose = document.createElement("button");
@@ -2206,6 +2413,7 @@
   function createDivider() {
     let d = document.createElement("span");
     d.className = "gmail-sort-divider";
+    d.setAttribute("aria-hidden", "true");
     return d;
   }
 

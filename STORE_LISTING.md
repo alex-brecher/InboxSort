@@ -20,6 +20,7 @@ Gmail gives you labels, stars, and categories -- but no way to simply sort your 
 - **Newest First** -- Restore Gmail's default order with one click
 - **Sender A-Z / Z-A** -- Group conversations by who sent them, alphabetically
 - **Unread First** -- Push unread messages to the top so nothing slips through
+- **Starred First** -- Put starred messages first, then sort each group by newest date
 
 **GROUP BY SENDER**
 
@@ -73,7 +74,7 @@ InboxSort adds a small toolbar directly below Gmail's action bar. Click a tab to
 
 **WORKS ACROSS GMAIL**
 
-InboxSort works on every Gmail view: Inbox, Sent, Drafts, Spam, Trash, custom labels, and categories like Promotions and Social. It handles pagination seamlessly and re-applies your sort whenever you navigate between pages or labels.
+InboxSort works in Inbox, categories, search results, and custom labels. The toolbar stays hidden in Sent, All Mail, message threads, and separate message windows.
 
 Install InboxSort and take control of your Gmail inbox in under 5 seconds.
 

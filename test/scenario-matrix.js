@@ -10,13 +10,17 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function row(id, sender, date, options = {}) {
   const unread = options.unread ? " zE" : "";
+  const senderClass = options.senderClass || "zF";
   const starClass = options.starred ? "T-KT T-KT-Jp" : "T-KT";
   const starLabel = options.starred ? "Starred" : "Not starred";
   const attachment = options.attachment ? '<span class="aZo"></span>' : "";
+  const senderMarkup = options.senderMarkup || (options.missingSender
+    ? ""
+    : `<span class="${senderClass}"${options.senderName ? ` name="${options.senderName}"` : ""}>${sender}</span>`);
   return `<tr class="zA${unread}" data-id="${id}" data-height="${options.height || 40}">
     <td><div role="checkbox" aria-checked="false"></div></td>
     <td class="apU"><span class="${starClass}" aria-label="${starLabel}"></span></td>
-    <td><span class="zF">${sender}</span></td>
+    <td>${senderMarkup}</td>
     <td><span class="bog">Subject ${id}</span><span class="y2">Snippet ${id}</span>${attachment}</td>
     <td><span title="${date}">${date}</span></td>
   </tr>`;
@@ -54,8 +58,8 @@ function installLayout(window) {
   };
 }
 
-function makeChrome(window, state) {
-  const listeners = [];
+function makeChrome(window, state, bus) {
+  const runtimeListeners = [];
   function subset(keys) {
     if (keys == null) return { ...state };
     if (Array.isArray(keys)) return Object.fromEntries(keys.filter((k) => k in state).map((k) => [k, state[k]]));
@@ -67,8 +71,8 @@ function makeChrome(window, state) {
     runtime: {
       id: "inboxsort-matrix",
       lastError: null,
-      getManifest: () => ({ version: "1.2.3" }),
-      onMessage: { addListener() {} }
+      getManifest: () => ({ version: "1.3.1" }),
+      onMessage: { addListener(listener) { runtimeListeners.push(listener); } }
     },
     storage: {
       sync: {
@@ -80,20 +84,43 @@ function makeChrome(window, state) {
             state[key] = next;
           }
           if (callback) callback();
-          for (const listener of listeners) listener(changes, "sync");
+          for (const listener of bus.listeners) listener(changes, "sync");
         }
       },
       local: {
         get(keys, callback) { callback(subset(keys)); },
-        set(value, callback) { Object.assign(state, value); if (callback) callback(); }
+        set(value, callback) {
+          const changes = {};
+          for (const [key, next] of Object.entries(value)) {
+            changes[key] = { oldValue: state[key], newValue: next };
+            state[key] = next;
+          }
+          if (callback) callback();
+          for (const listener of bus.listeners) listener(changes, "local");
+        }
       },
-      onChanged: { addListener(listener) { listeners.push(listener); } }
+      onChanged: { addListener(listener) { bus.listeners.push(listener); } }
+    },
+    _sendMessage(message) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const sendResponse = (response) => {
+          if (!settled) {
+            settled = true;
+            resolve(response);
+          }
+        };
+        for (const listener of runtimeListeners) {
+          listener(message, {}, sendResponse);
+        }
+        if (!settled) resolve(undefined);
+      });
     }
   };
 }
 
-async function createApp(url = "https://mail.google.com/mail/u/0/#inbox") {
-  const rows = [
+async function createApp(url = "https://mail.google.com/mail/u/0/#inbox", options = {}) {
+  const rows = options.rows || [
     row("unstar-new", "Zulu", "Aug 28, 2026, 11:00 AM", { unread: true, height: 42 }),
     row("star-old", "Beta", "Aug 26, 2026, 9:00 AM", { starred: true, height: 36 }),
     row("unstar-old", "Alpha", "Aug 25, 2026, 8:00 AM", { attachment: true, height: 48 }),
@@ -106,12 +133,13 @@ async function createApp(url = "https://mail.google.com/mail/u/0/#inbox") {
   const { window } = dom;
   installLayout(window);
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
-  const state = { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
-  window.chrome = makeChrome(window, state);
+  const state = options.state || { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const bus = options.bus || { listeners: [] };
+  window.chrome = makeChrome(window, state, bus);
   window.eval(source);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   await wait(700);
-  return { dom, window, state };
+  return { dom, window, state, bus };
 }
 
 function visualOrder(window) {
@@ -255,6 +283,112 @@ async function run() {
   await wait(260);
   assert.equal(state.groupEnabled, true);
   pass("Alt+7 Starred and Alt+6 Group shortcuts");
+
+  assert.equal(doc.querySelector('[data-stat="unread"]').tagName, "BUTTON");
+  assert.equal(doc.querySelector('[data-stat="starred"]').getAttribute("aria-pressed"), "false");
+  doc.querySelector('[data-stat="starred"]').click();
+  await wait(20);
+  assert.equal(doc.querySelector('[data-stat="starred"]').getAttribute("aria-pressed"), "true");
+  pass("stats quick filters use accessible button semantics");
+
+  const hiddenState = {
+    sortMode: "newest",
+    groupEnabled: false,
+    autoSort: true,
+    perLabel: false,
+    accentColor: "blue",
+    hiddenTabs: { sender: true, starred: true }
+  };
+  const hiddenApp = await createApp(undefined, { state: hiddenState });
+  assert.equal(hiddenApp.window.document.querySelector('[data-tab-group="sender"]').style.getPropertyValue("display"), "none");
+  assert.equal(hiddenApp.window.document.querySelector('[data-tab-group="starred"]').style.getPropertyValue("display"), "none");
+  assert.notEqual(hiddenApp.window.document.querySelector('[data-tab-group="date"]').style.getPropertyValue("display"), "none");
+  hiddenApp.window.dispatchEvent(new hiddenApp.window.Event("beforeunload"));
+  hiddenApp.dom.window.close();
+  pass("merged toolbar visibility settings map to real controls");
+
+  const readRows = [
+    row("read-zulu", "Zulu", "Aug 28, 2026, 11:00 AM", { senderClass: "yP" }),
+    row("unread-alpha", "Alpha", "Aug 28, 2026, 10:00 AM", { unread: true }),
+    row("read-beta", "", "Aug 28, 2026, 9:00 AM", { senderClass: "yP", senderName: "Beta" }),
+    row("multi-rox", "", "Aug 28, 2026, 8:30 AM", { senderMarkup: '<span class="bA4">Me, Rox</span><span class="zF" name="Me">Me</span><span class="yP">,</span><span class="zF" name="Rox">Rox</span>' }),
+    row("multi-edisa", "", "Aug 28, 2026, 8:15 AM", { senderMarkup: '<span class="bA4">Me, Edisa</span><span class="zF" name="Me">Me</span><span class="yP">,</span><span class="zF" name="Edisa">Edisa</span>' }),
+    row("missing", "", "Aug 28, 2026, 8:00 AM", { missingSender: true })
+  ];
+  const readApp = await createApp(undefined, { rows: readRows });
+  readApp.window.document.querySelector('[data-tab-group="sender"]').click();
+  await wait(30);
+  assert.deepEqual(visualOrder(readApp.window).map((x) => x.id), ["unread-alpha", "read-beta", "multi-edisa", "multi-rox", "read-zulu", "missing"]);
+  readApp.window.dispatchEvent(new readApp.window.Event("beforeunload"));
+  readApp.dom.window.close();
+  pass("read and multi-participant sender detection with missing-sender placement");
+
+  const clockRows = [
+    row("late", "Zulu", "23:05"),
+    row("early", "Alpha", "07:15")
+  ];
+  const clockApp = await createApp(undefined, { rows: clockRows });
+  clockApp.window.document.querySelector('[data-tab-group="date"]').click();
+  await wait(30);
+  assert.deepEqual(visualOrder(clockApp.window).map((x) => x.id), ["early", "late"]);
+  clockApp.window.dispatchEvent(new clockApp.window.Event("beforeunload"));
+  clockApp.dom.window.close();
+  pass("24-hour Gmail time parsing");
+
+  const snoozeState = {
+    sortMode: "starredFirst",
+    groupEnabled: true,
+    autoSort: true,
+    perLabel: false,
+    accentColor: "blue",
+    hiddenTabs: {},
+    snoozeState: {
+      sortMode: "starredFirst",
+      groupEnabled: true,
+      endTime: Date.now() + 120000
+    }
+  };
+  const snoozeApp = await createApp(undefined, { state: snoozeState });
+  const restoredSnooze = await snoozeApp.window.chrome._sendMessage({ action: "getState" });
+  assert.equal(restoredSnooze.isSnoozed, true);
+  assert.equal(restoredSnooze.sortMode, "newest");
+  assert.equal(restoredSnooze.snoozedSort, "starredFirst");
+  assert.ok(restoredSnooze.snoozeRemaining >= 1);
+  snoozeApp.window.dispatchEvent(new snoozeApp.window.Event("beforeunload"));
+  snoozeApp.dom.window.close();
+  pass("pause state survives Gmail reload");
+
+  const sharedState = {
+    sortMode: "newest",
+    groupEnabled: false,
+    autoSort: true,
+    perLabel: false,
+    accentColor: "blue",
+    hiddenTabs: {}
+  };
+  const sharedBus = { listeners: [] };
+  const firstTab = await createApp(undefined, { state: sharedState, bus: sharedBus });
+  const secondTab = await createApp(undefined, { state: sharedState, bus: sharedBus });
+  firstTab.window.document.querySelector('[data-tab-group="starred"]').click();
+  await wait(320);
+  assert.equal((await secondTab.window.chrome._sendMessage({ action: "getState" })).sortMode, "starredFirst");
+  assert.deepEqual(visualOrder(secondTab.window).map((x) => x.id), ["star-new", "star-old", "unstar-new", "unstar-old"]);
+  await firstTab.window.chrome._sendMessage({ action: "snoozeSort", minutes: 15 });
+  await wait(30);
+  const secondTabPaused = await secondTab.window.chrome._sendMessage({ action: "getState" });
+  assert.equal(secondTabPaused.isSnoozed, true);
+  assert.equal(secondTabPaused.sortMode, "newest");
+  await firstTab.window.chrome._sendMessage({ action: "cancelSnooze" });
+  await wait(280);
+  const secondTabResumed = await secondTab.window.chrome._sendMessage({ action: "getState" });
+  assert.equal(secondTabResumed.isSnoozed, false);
+  assert.equal(secondTabResumed.sortMode, "starredFirst");
+  pass("pause and resume synchronize across open Gmail tabs");
+  firstTab.window.dispatchEvent(new firstTab.window.Event("beforeunload"));
+  secondTab.window.dispatchEvent(new secondTab.window.Event("beforeunload"));
+  firstTab.dom.window.close();
+  secondTab.dom.window.close();
+  pass("sort changes synchronize across open Gmail tabs");
 
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);

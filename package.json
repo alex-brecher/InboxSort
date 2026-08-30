@@ -1,9 +1,9 @@
 {
   "name": "inboxsort",
-  "version": "1.2.3",
+  "version": "1.3.1",
   "private": true,
   "scripts": {
-    "test": "node test/scenario-matrix.js"
+    "test": "node test/scenario-matrix.js && node test/popup-accessibility.js"
   },
   "devDependencies": {
     "jsdom": "26.1.0"

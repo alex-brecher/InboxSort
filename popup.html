@@ -2,335 +2,165 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="header" id="header">
-    <div class="header-icon">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-        <rect x="2" y="5" width="20" height="14" rx="3" stroke="#fff" stroke-width="1.5"/>
-        <path d="M2 8l10 6 10-6" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
-        <g transform="translate(15, 13)">
-          <path d="M0 0v5" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M-1.5 3.5L0 5.5 1.5 3.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M4 5.5V0.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M2.5 2L4 0 5.5 2" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-        </g>
+  <header class="app-header" id="header">
+    <div class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <rect x="2.5" y="5" width="19" height="14" rx="3" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M3 8l9 5.5L21 8" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M16 14h5M18.5 11.5V16.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
     </div>
-    <div class="header-text">
-      <h2>InboxSort</h2>
-      <p>Sort &bull; Filter &bull; Organize</p>
+    <div class="brand-copy">
+      <h1>InboxSort</h1>
+      <p>Sort Gmail without leaving your inbox</p>
     </div>
-  </div>
+    <span class="connection-status" id="connectionStatus" role="status">Checking Gmail</span>
+  </header>
 
-  <!-- Sort Order Card -->
-  <div class="card">
-    <div class="card-inner">
-      <div class="section-label">
-        <span class="section-label-icon">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M1 3h10M1 6h7M1 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        </span>
-        Sort Order
+  <main class="popup-main">
+    <section class="panel" aria-labelledby="sortHeading">
+      <div class="section-heading">
+        <div>
+          <h2 id="sortHeading">Sort order</h2>
+          <p>Choose how the current message list is arranged.</p>
+        </div>
       </div>
-      <div class="sort-options" id="sortOptions">
-        <button class="sort-option" data-sort="oldest">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 13V3m-3.5 3.5L8 3l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
-          <span class="sort-option-label">Oldest First<span class="sort-option-desc">Show oldest emails at the top</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-        <button class="sort-option" data-sort="newest">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
-          <span class="sort-option-label">Newest First<span class="sort-option-desc">Restore Gmail's default order</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-        <button class="sort-option" data-sort="senderAZ">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M2 4h4M2 8h7M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </span>
-          <span class="sort-option-label">Sender A &rarr; Z<span class="sort-option-desc">Alphabetical by sender</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-        <button class="sort-option" data-sort="senderZA">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M2 4h10M2 8h7M2 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </span>
-          <span class="sort-option-label">Sender Z &rarr; A<span class="sort-option-desc">Reverse alphabetical</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-        <button class="sort-option" data-sort="unreadFirst">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12.5" cy="4" r="2" fill="currentColor"/></svg>
-          </span>
-          <span class="sort-option-label">Unread First<span class="sort-option-desc">Prioritize unread messages</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-        <button class="sort-option" data-sort="starredFirst">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 1.5l1.76 3.57 3.94.57-2.85 2.78.67 3.93L8 10.67l-3.52 1.68.67-3.93L2.3 5.64l3.94-.57L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-          </span>
-          <span class="sort-option-label">Starred First<span class="sort-option-desc">Starred messages first, newest within each group</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-      </div>
-      <div style="height:6px"></div>
-      <div class="section-label" style="font-size:10px;margin-bottom:4px;">
-        <span class="section-label-icon">
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg>
-        </span>
-        Group Overlay
-      </div>
-      <div class="sort-options">
-        <button class="sort-option group-toggle-option" data-action="toggleGroup" id="groupToggleBtn">
-          <span class="sort-option-icon">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg>
-          </span>
-          <span class="sort-option-label">Group by Sender<span class="sort-option-desc">Cluster emails by sender (works with any sort)</span></span>
-          <span class="sort-option-check"></span>
-        </button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Quick Filters + Color Picker (combined card) -->
-  <div class="card">
-    <div class="card-inner-compact">
-      <div class="section-label">
-        <span class="section-label-icon">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M1 2h10L7.5 6v3.5L4.5 11V6L1 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-        </span>
-        Quick Filters
+      <div class="sort-options" id="sortOptions" role="radiogroup" aria-label="Sort order">
+        <button class="sort-option" data-sort="newest" type="button" role="radio" aria-checked="false">
+          <span class="sort-option-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span><strong>Newest</strong><small>Gmail order</small></span>
+        </button>
+        <button class="sort-option" data-sort="oldest" type="button" role="radio" aria-checked="false">
+          <span class="sort-option-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><path d="M8 13V3m-3.5 3.5L8 3l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span><strong>Oldest</strong><small>Oldest first</small></span>
+        </button>
+        <button class="sort-option" data-sort="senderAZ" type="button" role="radio" aria-checked="false">
+          <span class="sort-option-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><path d="M2 4h4M2 8h7M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+          <span><strong>Sender A to Z</strong><small>Alphabetical</small></span>
+        </button>
+        <button class="sort-option" data-sort="senderZA" type="button" role="radio" aria-checked="false">
+          <span class="sort-option-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><path d="M2 4h10M2 8h7M2 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+          <span><strong>Sender Z to A</strong><small>Reverse</small></span>
+        </button>
+        <button class="sort-option" data-sort="unreadFirst" type="button" role="radio" aria-checked="false">
+          <span class="sort-option-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12.5" cy="4" r="2" fill="currentColor"/></svg></span>
+          <span><strong>Unread first</strong><small>Newest within groups</small></span>
+        </button>
+        <button class="sort-option" data-sort="starredFirst" type="button" role="radio" aria-checked="false">
+          <span class="sort-option-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><path d="M8 1.5l1.76 3.57 3.94.57-2.85 2.78.67 3.93L8 10.67l-3.52 1.68.67-3.93L2.3 5.64l3.94-.57L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
+          <span><strong>Starred first</strong><small>Newest within groups</small></span>
+        </button>
       </div>
+
+      <button class="setting-row group-toggle-option" id="groupToggleBtn" type="button" role="switch" aria-checked="false">
+        <span class="setting-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg></span>
+        <span class="setting-copy"><strong>Group by sender</strong><small>Keep each sender's messages together</small></span>
+        <span class="switch-control" aria-hidden="true"></span>
+      </button>
+    </section>
+
+    <section class="panel" aria-labelledby="filterHeading">
+      <div class="section-heading compact"><div><h2 id="filterHeading">Quick filters</h2><p>Filters can be combined.</p></div></div>
       <div class="filter-chips" id="filterChips">
-        <button class="filter-chip" data-filter="starred">
-          <span class="filter-chip-icon">
-            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M7 1l1.54 3.12 3.46.5-2.5 2.44.59 3.44L7 9.17l-3.09 1.33.59-3.44L2 4.62l3.46-.5L7 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-          </span>
-          Starred
+        <button class="filter-chip" data-filter="starred" type="button" aria-pressed="false">
+          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" aria-hidden="true"><path d="M7 1l1.54 3.12 3.46.5-2.5 2.44.59 3.44L7 9.17l-3.09 1.33.59-3.44L2 4.62l3.46-.5L7 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>Starred
         </button>
-        <button class="filter-chip" data-filter="unread">
-          <span class="filter-chip-icon">
-            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><rect x="1.5" y="3" width="11" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 4l5.5 3.5L12.5 4" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="11" cy="3" r="2" fill="currentColor"/></svg>
-          </span>
-          Unread
+        <button class="filter-chip" data-filter="unread" type="button" aria-pressed="false">
+          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" aria-hidden="true"><rect x="1.5" y="3" width="11" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 4l5.5 3.5L12.5 4" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="11" cy="3" r="2" fill="currentColor"/></svg>Unread
         </button>
-        <button class="filter-chip" data-filter="attachment">
-          <span class="filter-chip-icon">
-            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M12 6.5l-5 5a2.83 2.83 0 01-4-4l5-5a1.88 1.88 0 012.65 2.65L5.4 10.4a.94.94 0 01-1.33-1.33L9.15 3.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
-          Attachments
+        <button class="filter-chip" data-filter="attachment" type="button" aria-pressed="false">
+          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" aria-hidden="true"><path d="M12 6.5l-5 5a2.83 2.83 0 01-4-4l5-5a1.88 1.88 0 012.65 2.65L5.4 10.4a.94.94 0 01-1.33-1.33L9.15 3.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Attachments
         </button>
       </div>
-      <div class="card-divider"></div>
-      <div class="section-label" style="margin-top:2px">
-        <span class="section-label-icon">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>
-        </span>
-        Accent Color
-      </div>
-      <div class="color-picker" id="colorPicker">
-        <div class="color-swatch" data-color="blue" style="background:#1a73e8; color:#1a73e8"></div>
-        <div class="color-swatch" data-color="green" style="background:#1e8e3e; color:#1e8e3e"></div>
-        <div class="color-swatch" data-color="purple" style="background:#9334e6; color:#9334e6"></div>
-        <div class="color-swatch" data-color="red" style="background:#d93025; color:#d93025"></div>
-        <div class="color-swatch" data-color="orange" style="background:#e8710a; color:#e8710a"></div>
-        <div class="color-swatch" data-color="teal" style="background:#007b83; color:#007b83"></div>
-      </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Settings + Snooze (combined card) -->
-  <div class="card">
-    <div class="card-inner-compact">
-      <div class="section-label">
-        <span class="section-label-icon">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.46 2.46l1.06 1.06M8.48 8.48l1.06 1.06M9.54 2.46L8.48 3.52M3.52 8.48L2.46 9.54" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
-        </span>
-        Settings
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-info">
-          <div class="toggle-label">Auto-sort on load</div>
-          <div class="toggle-sublabel">Apply sort when Gmail opens</div>
-        </div>
-        <button class="toggle-switch on" id="toggleAutoSort" type="button"></button>
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-info">
-          <div class="toggle-label">Remember per label</div>
-          <div class="toggle-sublabel">Different sort for each label</div>
-        </div>
-        <button class="toggle-switch" id="togglePerLabel" type="button"></button>
-      </div>
-      <div class="card-divider"></div>
-      <div class="section-label" style="margin-top:2px">
-        <span class="section-label-icon">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3v3.5l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        Pause Sorting
-      </div>
+    <section class="panel" aria-labelledby="pauseHeading">
+      <div class="section-heading compact"><div><h2 id="pauseHeading">Pause sorting</h2><p>Temporarily return to Gmail's default order.</p></div></div>
       <div class="snooze-row" id="snoozeRow">
-        <button class="snooze-btn" data-minutes="15">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.8 1.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          15m
-        </button>
-        <button class="snooze-btn" data-minutes="30">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.8 1.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          30m
-        </button>
-        <button class="snooze-btn" data-minutes="60">
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.8 1.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          1h
-        </button>
+        <button class="snooze-btn" data-minutes="15" type="button">15 minutes</button>
+        <button class="snooze-btn" data-minutes="30" type="button">30 minutes</button>
+        <button class="snooze-btn" data-minutes="60" type="button">1 hour</button>
       </div>
-      <div class="snooze-status" id="snoozeStatus">
+      <div class="snooze-status" id="snoozeStatus" role="status" aria-live="polite">
         <span id="snoozeStatusText">Sorting paused</span>
-        <button class="snooze-cancel" id="snoozeCancel">Cancel</button>
+        <button class="snooze-cancel" id="snoozeCancel" type="button">Resume now</button>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Visible Tabs (collapsible) -->
-  <div class="card">
-    <div class="card-inner-compact">
-      <button class="collapse-toggle" id="toggleTabVis" type="button">
-        <div class="section-label">
-          <span class="section-label-icon">
-            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M1 6s2-3.5 5-3.5S11 6 11 6s-2 3.5-5 3.5S1 6 1 6z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" stroke-width="1.1"/></svg>
-          </span>
-          Visible Sort Tabs
-        </div>
-        <span class="collapse-arrow">
-          <svg viewBox="0 0 12 12" width="12" height="12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
+    <section class="panel" aria-labelledby="preferencesHeading">
+      <div class="section-heading"><div><h2 id="preferencesHeading">Preferences</h2></div></div>
+      <button class="setting-row" id="toggleAutoSort" type="button" role="switch" aria-checked="true">
+        <span class="setting-copy"><strong>Auto-sort on load</strong><small>Apply your saved sort when Gmail opens</small></span>
+        <span class="switch-control" aria-hidden="true"></span>
       </button>
-      <div class="collapse-body" id="tabVisBody">
-        <div class="tab-vis-grid" id="tabVisList">
-          <div class="tab-vis-item" data-tab="oldest">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M8 13V3m-3.5 3.5L8 3l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-              Oldest
-            </span>
-            <button class="tab-vis-toggle on" data-tab="oldest" type="button"></button>
-          </div>
-          <div class="tab-vis-item" data-tab="newest">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-              Newest
-            </span>
-            <button class="tab-vis-toggle on" data-tab="newest" type="button"></button>
-          </div>
-          <div class="tab-vis-item" data-tab="senderAZ">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M2 4h4M2 8h7M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
-              A &rarr; Z
-            </span>
-            <button class="tab-vis-toggle on" data-tab="senderAZ" type="button"></button>
-          </div>
-          <div class="tab-vis-item" data-tab="senderZA">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M2 4h10M2 8h7M2 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
-              Z &rarr; A
-            </span>
-            <button class="tab-vis-toggle on" data-tab="senderZA" type="button"></button>
-          </div>
-          <div class="tab-vis-item" data-tab="unreadFirst">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="12.5" cy="4" r="2" fill="currentColor"/></svg></span>
-              Unread
-            </span>
-            <button class="tab-vis-toggle on" data-tab="unreadFirst" type="button"></button>
-          </div>
-          <div class="tab-vis-item" data-tab="starredFirst">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M8 1.5l1.76 3.57 3.94.57-2.85 2.78.67 3.93L8 10.67l-3.52 1.68.67-3.93L2.3 5.64l3.94-.57L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
-              Starred
-            </span>
-            <button class="tab-vis-toggle on" data-tab="starredFirst" type="button"></button>
-          </div>
-          <div class="tab-vis-item" data-tab="groupSender">
-            <span class="tab-vis-name">
-              <span class="tab-vis-icon"><svg viewBox="0 0 16 16" width="10" height="10" fill="none"><path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg></span>
-              Group
-            </span>
-            <button class="tab-vis-toggle on" data-tab="groupSender" type="button"></button>
-          </div>
+      <button class="setting-row" id="togglePerLabel" type="button" role="switch" aria-checked="false">
+        <span class="setting-copy"><strong>Remember per label</strong><small>Use a different sort for each Gmail label</small></span>
+        <span class="switch-control" aria-hidden="true"></span>
+      </button>
+      <div class="accent-row">
+        <div><strong>Accent color</strong><small>Used for active controls in Gmail</small></div>
+        <div class="color-picker" id="colorPicker" role="radiogroup" aria-label="Accent color">
+          <button class="color-swatch blue" data-color="blue" type="button" role="radio" aria-checked="false" aria-label="Blue"></button>
+          <button class="color-swatch green" data-color="green" type="button" role="radio" aria-checked="false" aria-label="Green"></button>
+          <button class="color-swatch purple" data-color="purple" type="button" role="radio" aria-checked="false" aria-label="Purple"></button>
+          <button class="color-swatch red" data-color="red" type="button" role="radio" aria-checked="false" aria-label="Red"></button>
+          <button class="color-swatch orange" data-color="orange" type="button" role="radio" aria-checked="false" aria-label="Orange"></button>
+          <button class="color-swatch teal" data-color="teal" type="button" role="radio" aria-checked="false" aria-label="Teal"></button>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Shortcuts + Backup (collapsible) -->
-  <div class="card">
-    <div class="card-inner-compact">
-      <button class="collapse-toggle" id="toggleShortcuts" type="button">
-        <div class="section-label">
-          <span class="section-label-icon">
-            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><rect x="1" y="3" width="10" height="6" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M3 5h1M5 5h2M8 5h1M4 7h4" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/></svg>
-          </span>
-          Shortcuts &amp; Backup
-        </div>
-        <span class="collapse-arrow">
-          <svg viewBox="0 0 12 12" width="12" height="12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
+    <section class="panel collapsible-panel">
+      <button class="collapse-toggle" id="toggleTabVis" type="button" aria-expanded="false" aria-controls="tabVisBody">
+        <span><strong>Toolbar buttons</strong><small>Choose which controls appear inside Gmail</small></span>
+        <svg viewBox="0 0 12 12" width="14" height="14" fill="none" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <div class="collapse-body" id="shortcutsBody">
-        <div class="shortcut-list">
-          <div class="shortcut-item"><span>Oldest First</span><span class="shortcut-key">Alt+1</span></div>
-          <div class="shortcut-item"><span>Newest First</span><span class="shortcut-key">Alt+2</span></div>
-          <div class="shortcut-item"><span>Sender A-Z</span><span class="shortcut-key">Alt+3</span></div>
-          <div class="shortcut-item"><span>Sender Z-A</span><span class="shortcut-key">Alt+4</span></div>
-          <div class="shortcut-item"><span>Unread First</span><span class="shortcut-key">Alt+5</span></div>
-          <div class="shortcut-item"><span>Toggle Group</span><span class="shortcut-key">Alt+6</span></div>
-          <div class="shortcut-item"><span>Starred First</span><span class="shortcut-key">Alt+7</span></div>
-          <div class="shortcut-item"><span>Clear Filters</span><span class="shortcut-key">Alt+0</span></div>
-          <div class="shortcut-item"><span>Focus Search</span><span class="shortcut-key">/</span></div>
-          <div class="shortcut-item"><span>Shortcut Help</span><span class="shortcut-key">?</span></div>
+      <div class="collapse-body" id="tabVisBody" hidden>
+        <div class="tab-vis-list" id="tabVisList">
+          <button class="tab-vis-item" data-tab="date" type="button" role="switch" aria-checked="true"><span>Date</span><span class="mini-switch" aria-hidden="true"></span></button>
+          <button class="tab-vis-item" data-tab="sender" type="button" role="switch" aria-checked="true"><span>Sender</span><span class="mini-switch" aria-hidden="true"></span></button>
+          <button class="tab-vis-item" data-tab="unread" type="button" role="switch" aria-checked="true"><span>Unread</span><span class="mini-switch" aria-hidden="true"></span></button>
+          <button class="tab-vis-item" data-tab="starred" type="button" role="switch" aria-checked="true"><span>Starred</span><span class="mini-switch" aria-hidden="true"></span></button>
+          <button class="tab-vis-item" data-tab="groupSender" type="button" role="switch" aria-checked="true"><span>Group</span><span class="mini-switch" aria-hidden="true"></span></button>
         </div>
-        <div class="card-divider" style="margin-top:8px"></div>
-        <div class="section-label" style="margin-top:6px">
-          <span class="section-label-icon">
-            <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M6 2v5M4 5l2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 8v2h8V8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
-          Backup &amp; Restore
-        </div>
-        <div class="export-import-row">
-          <button class="export-import-btn" id="exportBtn" type="button">
-            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M7 2v6M5 6l2 2 2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9.5v2.5h10V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Export
-          </button>
-          <button class="export-import-btn" id="importBtn" type="button">
-            <svg viewBox="0 0 14 14" width="11" height="11" fill="none"><path d="M7 8V2M5 4l2-2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 9.5v2.5h10V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Import
-          </button>
-          <input type="file" id="importFileInput" accept=".json">
-        </div>
-        <div class="export-import-status" id="exportImportStatus"></div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Reset Card -->
-  <div class="card" style="margin-bottom: 2px">
-    <div class="card-inner-tight">
-      <button class="reset-btn" id="resetBtn" type="button">
-        <svg viewBox="0 0 14 14" width="12" height="12" fill="none"><path d="M2 7a5 5 0 0 1 9.33-2.5M12 7a5 5 0 0 1-9.33 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.33 2v2.5h-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.67 12v-2.5h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Reset to Default
+    <section class="panel collapsible-panel">
+      <button class="collapse-toggle" id="toggleShortcuts" type="button" aria-expanded="false" aria-controls="shortcutsBody">
+        <span><strong>Shortcuts and backup</strong><small>Keyboard commands, export, and import</small></span>
+        <svg viewBox="0 0 12 12" width="14" height="14" fill="none" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-    </div>
-  </div>
+      <div class="collapse-body" id="shortcutsBody" hidden>
+        <div class="shortcut-list" aria-label="Keyboard shortcuts">
+          <div class="shortcut-item"><span>Oldest / Newest</span><span><kbd>Alt 1</kbd><kbd>Alt 2</kbd></span></div>
+          <div class="shortcut-item"><span>Sender A to Z / Z to A</span><span><kbd>Alt 3</kbd><kbd>Alt 4</kbd></span></div>
+          <div class="shortcut-item"><span>Unread / Group / Starred</span><span><kbd>Alt 5</kbd><kbd>Alt 6</kbd><kbd>Alt 7</kbd></span></div>
+          <div class="shortcut-item"><span>Clear all</span><kbd>Alt 0</kbd></div>
+          <div class="shortcut-item"><span>Search / Help</span><span><kbd>/</kbd><kbd>?</kbd></span></div>
+        </div>
+        <div class="backup-row">
+          <button class="secondary-btn" id="exportBtn" type="button">Export settings</button>
+          <button class="secondary-btn" id="importBtn" type="button">Import settings</button>
+          <input type="file" id="importFileInput" accept="application/json,.json">
+        </div>
+        <div class="export-import-status" id="exportImportStatus" role="status" aria-live="polite"></div>
+      </div>
+    </section>
 
-  <div class="footer">
+    <button class="reset-btn" id="resetBtn" type="button">Reset all settings</button>
+  </main>
+
+  <footer class="footer">
     <span id="inboxsort-version">InboxSort</span>
-    <span class="footer-dot"></span>
-    <span>made by Alex Brecher</span>
-    <span class="footer-dot"></span>
-    <a href="mailto:abrecher@gmail.com" class="footer-link">Feedback</a>
-  </div>
+    <span aria-hidden="true">•</span>
+    <a href="https://github.com/alex-brecher/InboxSort" target="_blank" rel="noreferrer">Open source on GitHub</a>
+  </footer>
 
   <script src="popup.js"></script>
 </body>

@@ -4,9 +4,9 @@
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Add%20to%20Chrome-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/inboxsort/mmbbiejiidimjaceddigelomncimdegb)
 
-Gmail gives you labels, stars, and categories — but no way to sort your inbox by sender name or push unread messages to the top. InboxSort adds a clean, native-feeling toolbar directly into Gmail with one-click sorting, real-time filters, live search, keyboard shortcuts, and a stats bar.
+Gmail gives you labels, stars, and categories, but no way to sort your inbox by sender name or push unread messages to the top. InboxSort adds a compact toolbar to Gmail with one-click sorting, filters, search, keyboard shortcuts, and message counts.
 
-Works visually using CSS transforms — your actual inbox is never modified.
+InboxSort uses CSS transforms. It does not change your actual inbox.
 
 ---
 
@@ -61,9 +61,9 @@ A slim bar below your sort tabs showing real-time counts: **total**, **unread**,
 
 ### Smart Preferences
 
-- **Auto-sort on load** — Your last-used sort applies automatically when Gmail opens
-- **Per-label preferences** — Different sort settings for Inbox, Sent, Promotions, or any label
-- **Pause sorting** — Temporarily suspend sorting for 15 minutes, 30 minutes, or 1 hour, with automatic restore when the timer expires
+- **Auto-sort on load:** Your last-used sort applies when Gmail opens
+- **Per-label preferences:** Use different sort settings for Inbox, categories, or custom labels
+- **Pause sorting:** Stop sorting for 15 minutes, 30 minutes, or 1 hour, then restore the prior sort
 
 ### Customizable Toolbar
 
@@ -79,15 +79,15 @@ Export all your settings (sort mode, accent color, toggles, hidden tabs, per-lab
 
 ### Dark Mode
 
-Automatic detection of Gmail's dark theme — no configuration needed. Dedicated dark-mode color variants for all accent colors, badges, overlays, and toolbar elements. Follows your system preference and updates instantly when the OS theme changes.
+InboxSort detects Gmail's dark theme. Dark-mode colors apply to toolbar controls, badges, and dialogs.
 
 ### Privacy First
 
-- **Zero data collection** — No analytics, tracking, or telemetry
-- **No network requests** — InboxSort never contacts any external server or API
-- **Minimal permissions** — Only `activeTab` (interact with the Gmail page) and `storage` (save preferences locally)
-- **Fully local** — All processing happens in your browser. Your data never leaves
-- **Open source** — The entire codebase is auditable
+- **Zero data collection:** No analytics, tracking, or telemetry
+- **No network requests:** InboxSort does not contact an external server or API
+- **Minimal permissions:** `activeTab` runs InboxSort in Gmail, and `storage` saves your preferences
+- **Local processing:** InboxSort processes the visible message list in your browser
+- **Open source:** Review the complete source code
 
 ---
 
@@ -104,9 +104,9 @@ No account creation, sign-up, or configuration required.
 
 ## How It Works
 
-InboxSort adds a toolbar directly below Gmail's action bar. Click a tab to sort, use the search bar to filter, and glance at the stats bar for a snapshot of your page. Everything happens visually using CSS transforms — emails are reordered on screen without moving, deleting, or modifying anything in your actual inbox.
+InboxSort adds a toolbar below Gmail's action bar. Select a sort, filter the visible list, or examine the message counts. CSS transforms change the visual order without moving, deleting, or changing your messages.
 
-Works on every Gmail view: Inbox, Sent, Drafts, Spam, Trash, Starred, Important, All Mail, custom labels, and categories like Promotions and Social. Handles pagination seamlessly and re-applies sort settings when navigating between pages or labels.
+InboxSort works in Inbox, categories, search results, and custom labels. The toolbar stays hidden in Sent, All Mail, message threads, and separate message windows.
 
 ---
 
@@ -132,7 +132,7 @@ InboxSort does **not** request `identity`, `cookies`, `history`, `bookmarks`, `d
 
 ## Version
 
-**v1.2.3** - See [CHANGELOG.md](CHANGELOG.md) for release history.
+**v1.3.1** - See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
 
@@ -144,7 +144,7 @@ This project is provided for personal use. All rights reserved.
 
 ## Contact
 
-**Alex Brecher** — [abrecher@gmail.com](mailto:abrecher@gmail.com)
+**Alex Brecher:** [abrecher@gmail.com](mailto:abrecher@gmail.com)
 
 ---
 
