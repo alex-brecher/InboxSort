@@ -282,6 +282,8 @@ async function run() {
   doc.body.dispatchEvent(new window.KeyboardEvent("keydown", { bubbles: true, altKey: true, code: "Digit6", key: "6" }));
   await wait(260);
   assert.equal(state.groupEnabled, true);
+  assert.equal(doc.querySelector("tr.zA").style.transition, "none");
+  assertNoOverlap(visualOrder(window));
   pass("Alt+7 Starred and Alt+6 Group shortcuts");
 
   assert.equal(doc.querySelector('[data-stat="unread"]').tagName, "BUTTON");

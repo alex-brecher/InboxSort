@@ -2045,8 +2045,12 @@
       showNotification("Grouping off");
       return;
     }
-    // skipClear=true because we already cleared above; animate=true for user-initiated
-    let sortedCount = applySortTransforms(currentSort === "newest" ? "newest" : currentSort, true, true);
+    // Grouping changes the visual order and can touch every Gmail row at once.
+    // Do this as an atomic placement instead of a staggered transform animation:
+    // Gmail composites <tr> layers independently during the transition, which
+    // briefly paints old and new row content on top of each other.
+    // skipClear=true because we already cleared above.
+    let sortedCount = applySortTransforms(currentSort === "newest" ? "newest" : currentSort, false, true);
     refreshUI();
     if (groupEnabled) {
       showNotification("Grouped by sender");
