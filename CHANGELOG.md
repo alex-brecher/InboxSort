@@ -5,6 +5,14 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.3.2] -- 2026-08-31
+
+### Fixed
+- Prevented Group mode from briefly stacking Gmail row content during its transition by applying the new row positions atomically.
+- Added a regression assertion that Group mode has no row transition and no overlap.
+
+---
+
 ## [1.3.1] -- 2026-08-30
 
 ### Added

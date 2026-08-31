@@ -1,4 +1,4 @@
-# InboxSort 1.3.1 QA Report
+# InboxSort 1.3.2 QA Report
 
 Date: August 31, 2026
 Scope: Gmail list sorting, filtering, grouping, navigation, persistence, popup controls, accessibility, and responsive behavior.
@@ -8,9 +8,9 @@ Scope: Gmail list sorting, filtering, grouping, navigation, persistence, popup c
 - Automated scenarios: 31 passed, 0 failed.
 - Live Gmail acceptance: passed across 22 real inbox rows.
 - JavaScript syntax, manifest validation, Git whitespace checks, and Impeccable interface checks: passed.
-- Chrome Web Store upload package: version 1.3.1, rebuilt after the final live and automated passes.
-- Source commit: `21f5361` pushed to GitHub `main`.
-- Package SHA-256: `afe9b9953eb779335d5cce2ff28e780f57be69bd2274c72ed826327dc1185bcc`.
+- Chrome Web Store upload package: version 1.3.2, rebuilt after the final live and automated passes.
+- Source commit: updated release commit is pushed to GitHub `main`.
+- Package SHA-256: `a76eb25e99fca6bb30f85775ac84af19cab44ef3d8b1e181ed9a9e45beb63dff`.
 
 ## Live Gmail acceptance
 
