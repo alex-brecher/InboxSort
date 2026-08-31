@@ -1,6 +1,6 @@
 # InboxSort 1.3.1 QA Report
 
-Date: August 30, 2026
+Date: August 31, 2026
 Scope: Gmail list sorting, filtering, grouping, navigation, persistence, popup controls, accessibility, and responsive behavior.
 
 ## Release result
@@ -8,7 +8,9 @@ Scope: Gmail list sorting, filtering, grouping, navigation, persistence, popup c
 - Automated scenarios: 31 passed, 0 failed.
 - Live Gmail acceptance: passed across 22 real inbox rows.
 - JavaScript syntax, manifest validation, Git whitespace checks, and Impeccable interface checks: passed.
-- Chrome Web Store upload package: built only after the final live and automated passes.
+- Chrome Web Store upload package: version 1.3.1, rebuilt after the final live and automated passes.
+- Source commit: `21f5361` pushed to GitHub `main`.
+- Package SHA-256: `afe9b9953eb779335d5cce2ff28e780f57be69bd2274c72ed826327dc1185bcc`.
 
 ## Live Gmail acceptance
 
@@ -19,7 +21,7 @@ Scope: Gmail list sorting, filtering, grouping, navigation, persistence, popup c
 | Unread | Unread First puts unread messages first and sorts each section by newest date | Pass |
 | Date | Oldest and newest orders match 21 parseable real Gmail dates | Pass |
 | Sender | A to Z and Z to A work on 22 rows, including aggregate multi-person names such as `me, Edisa`; rows without a sender stay last | Pass |
-| Grouping | Sender groups toggle on and off with correct badges, classes, and row placement | Pass |
+| Grouping | Sender groups toggle on and off with correct badges, classes, and row placement; the user-triggered Group transition is atomic with no stacked-text frame | Pass |
 | Filters | Unread, starred, attachment, combined quick filters, and text search dim the correct rows | Pass |
 | Shortcuts | Alt+7 Starred, Alt+6 Group, Alt+0 Clear, `/` search focus, `?` help, and Escape behaviors | Pass |
 | Navigation | Inbox, Promotions, Search, thread detail, and inbox return transitions | Pass |
@@ -45,7 +47,7 @@ The content-script suite contains 23 scenarios:
 12. New email arrival during an active sort
 13. Row removal during an active sort
 14. Rapid sort cycling
-15. Alt+7 Starred and Alt+6 Group shortcut compatibility
+15. Alt+7 Starred and Alt+6 Group shortcut compatibility, including atomic Group placement
 16. Accessible stats-filter button semantics
 17. Toolbar visibility settings mapped to real merged controls
 18. Read and multi-participant sender detection, including missing-sender placement
