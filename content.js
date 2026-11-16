@@ -1923,7 +1923,7 @@
 
     if (mode === "newest") {
       currentSort = "newest";
-      saveState();
+      if (!silent) saveState();
 
       // If group is enabled, still need to apply transforms for grouping
       // Apply transforms BEFORE refreshUI to avoid two-frame jump
@@ -1935,7 +1935,9 @@
       } else {
         refreshUI();
         if (!silent) showNotification("Default order restored");
-        if (originalPage && location.hash !== originalPage) {
+        // Only a deliberate user action may navigate Gmail. Silent re-applies
+        // (auto-sort, other tabs, resize) must leave the current page alone.
+        if (!silent && originalPage && location.hash !== originalPage) {
           isNavigating = true;
           location.hash = originalPage;
           originalPage = null;
@@ -1949,10 +1951,13 @@
       let pag = parsePagination();
       let lastPage = getLastPageNumber();
 
-      if (!pag || lastPage <= 1 || isOnLastPage()) {
+      // Jump to the last page only when the user picks Oldest. Silent
+      // re-applies sort the page in view; otherwise the user could never
+      // leave the last page while Oldest is active.
+      if (silent || !pag || lastPage <= 1 || isOnLastPage()) {
         let count = applySortTransforms("oldest", !silent, true);
         currentSort = "oldest";
-        saveState();
+        if (!silent) saveState();
         refreshUI();
         if (count > 0 && !silent) showNotification(groupEnabled ? "Grouped, oldest first" : "Sorted oldest first");
         if (groupEnabled && count > 0) startGroupStyleInterval();
@@ -1974,7 +1979,7 @@
         if (loaded) {
           let cnt = applySortTransforms("oldest", !silent);
           currentSort = "oldest";
-          saveState();
+          if (!silent) saveState();
           refreshUI();
           if (cnt > 0 && !silent) showNotification(groupEnabled ? "Grouped, oldest first" : "Sorted oldest first");
           if (groupEnabled && cnt > 0) startGroupStyleInterval();
@@ -1993,7 +1998,7 @@
     }
     let sortedCount = applySortTransforms(mode, !silent, true);
     currentSort = mode;
-    saveState();
+    if (!silent) saveState();
     refreshUI();
     if (sortedCount > 0 && !silent && modeObj) {
       showNotification(groupEnabled ? "Grouped, " + modeObj.label.toLowerCase() : modeObj.label);

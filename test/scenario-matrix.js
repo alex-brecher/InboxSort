@@ -127,7 +127,7 @@ async function createApp(url = "https://mail.google.com/mail/u/0/#inbox", option
     row("star-new", "Gamma", "Aug 28, 2026, 10:00 AM", { starred: true, unread: true, height: 40 })
   ].join("");
   const dom = new JSDOM(
-    `<!doctype html><html><body><div gh="tm"></div><div role="main"><table><tbody>${rows}</tbody></table></div></body></html>`,
+    `<!doctype html><html><body><div gh="tm">${options.toolbarHtml || ""}</div><div role="main"><table><tbody>${rows}</tbody></table></div></body></html>`,
     { url, runScripts: "outside-only", pretendToBeVisual: true }
   );
   const { window } = dom;
@@ -391,6 +391,22 @@ async function run() {
   firstTab.dom.window.close();
   secondTab.dom.window.close();
   pass("sort changes synchronize across open Gmail tabs");
+
+  // Regression: with Oldest saved, opening page 1 must not bounce to the last page.
+  const pagedState = { sortMode: "oldest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const paged = await createApp(undefined, { state: pagedState, toolbarHtml: '<span class="Dj">1–100 of 197</span>' });
+  await wait(300);
+  assert.equal(paged.window.location.hash, "#inbox");
+  assert.deepEqual(visualOrder(paged.window).map((x) => x.id), ["unstar-old", "star-old", "star-new", "unstar-new"]);
+  assert.equal(pagedState.sortMode, "oldest");
+  paged.window.document.querySelector('[data-tab-group="date"]').click();
+  await wait(20);
+  paged.window.document.querySelector('[data-tab-group="date"]').click();
+  await wait(20);
+  assert.equal(paged.window.location.hash, "#inbox/p2");
+  paged.window.dispatchEvent(new paged.window.Event("beforeunload"));
+  paged.dom.window.close();
+  pass("saved Oldest sorts the current page and only jumps when chosen");
 
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);
