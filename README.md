@@ -77,9 +77,9 @@ Choose from six colors to match your style: **blue**, **green**, **purple**, **r
 
 Export all your settings (sort mode, accent color, toggles, hidden tabs, per-label preferences) to a JSON file. Import them on another browser or machine.
 
-### Dark Mode
+### Light, Dark and System
 
-InboxSort detects Gmail's dark theme. Dark-mode colors apply to toolbar controls, badges, and dialogs.
+Pick Appearance in the popup. System (the default) follows your computer's light or dark setting and switches with it. Light and Dark force a theme. The popup, toolbar, badges, group colors and dialogs all follow the same setting.
 
 ### Privacy First
 
@@ -105,6 +105,8 @@ No account creation, sign-up, or configuration required.
 ## How It Works
 
 InboxSort adds a toolbar below Gmail's action bar. Select a sort, filter the visible list, or examine the message counts. CSS transforms change the visual order without moving, deleting, or changing your messages.
+
+Gmail shows at most 100 conversations per page and only loads the page you are on, so InboxSort sorts that page. The email count shows which page it covers. If Gmail is set to fewer than 100 per page, InboxSort offers a button that opens the setting.
 
 InboxSort works in Inbox, categories, search results, and custom labels. The toolbar stays hidden in Sent, All Mail, message threads, and separate message windows.
 
@@ -132,7 +134,7 @@ InboxSort does **not** request `identity`, `cookies`, `history`, `bookmarks`, `d
 
 ## Version
 
-**v1.3.2** - See [CHANGELOG.md](CHANGELOG.md) for release history.
+**v1.4.0** - See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
 

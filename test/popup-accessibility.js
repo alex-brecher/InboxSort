@@ -55,7 +55,7 @@ async function createPopup(options = {}) {
     runtime: {
       id: "inboxsort-popup",
       lastError: null,
-      getManifest: () => ({ version: "1.3.2" })
+      getManifest: () => ({ version: "1.4.0" })
     },
     storage: {
       sync: {
@@ -114,7 +114,7 @@ async function run() {
   assert.equal(doc.querySelector('[data-filter="starred"]').getAttribute("aria-pressed"), "true");
   assert.equal(doc.querySelector("#snoozeStatus").classList.contains("visible"), true);
   assert.match(doc.querySelector("#snoozeStatusText").textContent, /12m remaining/);
-  assert.equal(doc.querySelector("#inboxsort-version").textContent, "InboxSort v1.3.2");
+  assert.equal(doc.querySelector("#inboxsort-version").textContent, "InboxSort v1.4.0");
   pass("live Gmail state and version rendering");
 
   const toolbarToggle = doc.querySelector("#toggleTabVis");
