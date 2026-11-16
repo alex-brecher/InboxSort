@@ -171,7 +171,7 @@ async function run() {
   assert.doesNotMatch(css, /cubic-bezier\(0\.34,\s*1\.56/);
   pass("visual system avoids gradients and bounce motion");
 
-  window.dispatchEvent(new window.Event("unload"));
+  window.dispatchEvent(new window.Event("pagehide"));
   popup.dom.window.close();
 
   const darkSystem = await createPopup({ systemDark: true, storage: { appearance: "system" } });
@@ -184,7 +184,7 @@ async function run() {
 
   const disconnected = await createPopup({ gmail: false });
   assert.equal(disconnected.window.document.querySelector("#connectionStatus").textContent, "Open Gmail");
-  disconnected.window.dispatchEvent(new disconnected.window.Event("unload"));
+  disconnected.window.dispatchEvent(new disconnected.window.Event("pagehide"));
   disconnected.dom.window.close();
   pass("non-Gmail tab shows a clear connection state");
 

@@ -492,6 +492,23 @@ async function run() {
   themeApp.dom.window.close();
   pass("group marks survive Gmail swapping a row element");
 
+  // Regression: per-label memory is pruned so it can never outgrow sync's 8 KB item limit.
+  const manyPrefs = {};
+  for (let i = 0; i < 120; i++) manyPrefs["label/Project-" + i + "-" + "x".repeat(40)] = "senderAZ";
+  const prefsState = { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: true, accentColor: "blue", hiddenTabs: {}, labelPrefs: manyPrefs };
+  const prefsApp = await createApp(undefined, { state: prefsState });
+  prefsApp.window.document.querySelector('[data-tab-group="starred"]').click();
+  await wait(400);
+  const savedKeys = Object.keys(prefsState.labelPrefs);
+  assert.ok(savedKeys.length <= 60, `kept ${savedKeys.length} labels`);
+  assert.ok(JSON.stringify(prefsState.labelPrefs).length <= 6000);
+  assert.equal(savedKeys[savedKeys.length - 1], "inbox");
+  assert.equal(prefsState.labelPrefs.inbox, "starredFirst");
+  assert.equal(prefsState.sortMode, "starredFirst");
+  prefsApp.window.dispatchEvent(new prefsApp.window.Event("beforeunload"));
+  prefsApp.dom.window.close();
+  pass("per-label sort memory is pruned under the sync item limit");
+
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);
   popout.window.dispatchEvent(new popout.window.Event("beforeunload"));

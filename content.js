@@ -132,8 +132,6 @@
   const CONFIG = {
     // Row cache time-to-live (ms) — how long getVisibleEmailRows() reuses cached results
     ROW_CACHE_TTL: 500,
-    // Row metadata cache TTL (ms) — volatile values are refreshed in stats/filter paths
-    ROW_META_TTL: 3000,
     // Persist state writes are debounced to avoid sync-storage quota spikes
     SAVE_STATE_DEBOUNCE: 200,
     SAVE_STATE_RETRY_BASE: 1000,
@@ -144,11 +142,10 @@
     SORT_DELAY_INCREMENT: 6,            // ms added per-row for stagger effect
     SORT_DELAY_MAX: 300,                // cap on per-row stagger delay (ms)
 
-    // Group-by-sender style-reapply interval (Gmail aggressively wipes inline styles)
-    GROUP_FAST_INTERVAL: 400,           // aggressive re-check interval (ms) for first 10s
-    GROUP_SLOW_INTERVAL: 2000,          // maintenance interval (ms) after fast phase
-    GROUP_FAST_TICKS: 25,               // ticks in fast phase (25 × 400ms = 10s)
-    GROUP_MAX_TICKS: 85,                // total ticks before auto-stop (≈2 min)
+    // Per-label sort memory lives in sync storage (8 KB per item). Keep it
+    // well under that so a growing label list can never block saving.
+    LABEL_PREFS_MAX_ENTRIES: 60,
+    LABEL_PREFS_MAX_BYTES: 6000,
 
     // Pagination poll — waits for Gmail to load the next page of results
     PAGINATION_TIMEOUT: 10000,          // give up after 10s
@@ -351,8 +348,28 @@
     }
   }
 
+  // Write-rate limits clear on their own, so those writes are retried with
+  // backoff. Size limits (QUOTA_BYTES*) never clear by waiting.
   function isStorageQuotaError(msg) {
-    return /quota|max_write_operations|write operations/i.test(String(msg || ""));
+    return /max_write_operations|write operations/i.test(String(msg || ""));
+  }
+
+  function isStorageSizeError(msg) {
+    return /quota_bytes|quota exceeded|bytes/i.test(String(msg || "")) && !isStorageQuotaError(msg);
+  }
+
+  // Most recently used labels last; oldest dropped first.
+  function trimLabelPrefs(prefs, currentLabel) {
+    let out = {};
+    let keys = Object.keys(prefs).filter(function (k) { return k !== currentLabel && isKnownSortMode(prefs[k]); });
+    for (let i = 0; i < keys.length; i++) out[keys[i]] = prefs[keys[i]];
+    if (currentLabel && prefs[currentLabel]) out[currentLabel] = prefs[currentLabel];
+    let ordered = Object.keys(out);
+    while (ordered.length > 1 &&
+           (ordered.length > CONFIG.LABEL_PREFS_MAX_ENTRIES || JSON.stringify(out).length > CONFIG.LABEL_PREFS_MAX_BYTES)) {
+      delete out[ordered.shift()];
+    }
+    return out;
   }
 
   function clearAccentColorVars() {
@@ -456,6 +473,14 @@
             finishSaveState(true);
             return;
           }
+          if (isStorageSizeError(errMsg) && data.labelPrefs) {
+            // Never let per-label memory block the main settings.
+            console.warn("[InboxSort] label sort memory too large; saving without it:", errMsg);
+            let slim = Object.assign({}, data);
+            delete slim.labelPrefs;
+            persistStateSnapshot(slim);
+            return;
+          }
           console.warn("[InboxSort] saveState set runtime error:", errMsg);
         }
         finishSaveState(false);
@@ -514,8 +539,10 @@
             return;
           }
           let prefs = stored && stored.labelPrefs && typeof stored.labelPrefs === "object" ? stored.labelPrefs : {};
-          prefs[getCurrentLabel()] = persistedSort;
-          data.labelPrefs = prefs;
+          let label = getCurrentLabel();
+          delete prefs[label];            // re-insert so it counts as most recent
+          prefs[label] = persistedSort;
+          data.labelPrefs = trimLabelPrefs(prefs, label);
           persistStateSnapshot(data);
         });
       } catch (getErr) {
@@ -1017,19 +1044,26 @@
 
   let _rowMeta = new WeakMap();
 
-  function getRowMeta(row, forceRefresh) {
-    if (forceRefresh === undefined) forceRefresh = false;
-    let now = Date.now();
-    let cached = _rowMeta.get(row);
-    if (!forceRefresh && cached && (now - cached.ts) < CONFIG.ROW_META_TTL) return cached.value;
-    let meta = {
-      sender: getSenderFromRow(row),
-      date: getDateFromRow(row),
-      unread: isUnread(row),
-      starred: isRowStarred(row),
-      attachment: isRowHasAttachment(row)
-    };
-    _rowMeta.set(row, { value: meta, ts: now });
+  // Sender, date and attachment do not change for a given row element (Gmail
+  // swaps the element when content changes), so they are read once. Unread
+  // and starred flip in place, so refreshVolatile re-reads just those.
+  function getRowMeta(row, refreshVolatile) {
+    let meta = _rowMeta.get(row);
+    if (!meta) {
+      meta = {
+        sender: getSenderFromRow(row),
+        date: getDateFromRow(row),
+        unread: isUnread(row),
+        starred: isRowStarred(row),
+        attachment: isRowHasAttachment(row)
+      };
+      _rowMeta.set(row, meta);
+      return meta;
+    }
+    if (refreshVolatile) {
+      meta.unread = isUnread(row);
+      meta.starred = isRowStarred(row);
+    }
     return meta;
   }
 
@@ -2967,7 +3001,7 @@
           snoozeRemaining: snoozed ? Math.max(0, Math.ceil((snoozeEndTime - Date.now()) / 60000)) : 0,
           snoozedSort: snoozedSort
         });
-        return true; // async response
+        return false; // responded synchronously
     }
     if (handled) sendResponse({ ok: true });
   });
@@ -3016,6 +3050,7 @@
   // the current sort after Gmail re-renders at the new width.
 
   window.addEventListener("resize", function () {
+    if (_contextInvalid) return;
     // Only re-sort if transforms are actively applied
     if (currentSort === "newest" && !groupEnabled) return;
 

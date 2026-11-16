@@ -799,12 +799,10 @@ try {
 } catch (_) {}
 
 // Surface connection state without inserting layout-shifting content.
+// Say "Open Gmail" right away on other tabs; on a Gmail tab keep "Checking
+// Gmail" until the content script actually answers.
 getGmailTab(function (tab) {
-  if (!tab) {
-    setConnectionStatus("open");
-  } else {
-    setConnectionStatus("connected");
-  }
+  if (!tab) setConnectionStatus("open");
 });
 
 // Query live state from content script after a small delay
@@ -832,6 +830,6 @@ document.addEventListener("visibilitychange", function () {
   }
 });
 
-window.addEventListener("unload", function () {
+window.addEventListener("pagehide", function () {
   stopLiveStateSync();
 });
