@@ -5,6 +5,25 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.4.2] -- 2026-11-16
+
+### Changed
+- Suggest an idea and Report a problem now open the Netrition feedback form instead of GitHub. Reporters need no GitHub account and reports stay private. They are saved and emailed to the developer. The extension still makes no network requests: the app name, version and feedback type travel in the URL fragment.
+- Privacy policy, store description and README describe the optional form and what it collects.
+
+### Fixed
+- After opening a thread and going back (search results, or with auto-sort off), rows could stay visually sorted while InboxSort treated the list as unsorted, so Gmail's own shift-click picked the wrong range. Rows are now restored, and the check looks at the rows themselves.
+- Auto-sort could stop for the rest of the session after quick label switching.
+- Switching labels sometimes did not re-apply the saved sort: Gmail swaps the whole message area and goes quiet before InboxSort reconnects. The reconnect now runs a check right away.
+- After an extension update with Gmail open, the old copy now detects it and puts Gmail's order back and removes filters, instead of leaving rows moved and dimmed.
+- Inboxes with sections (Priority Inbox, Important/Unread/Starred first, Multiple Inboxes) are sorted within each section. Before, rows could overlap across sections.
+- Shift-click ranges skip rows hidden by a filter.
+- Toggling Group while sorting is paused keeps the saved sort.
+- Alt+0 ends a pause; resizing or a change in another tab no longer sorts search results you did not sort.
+- Less background work while an email is open.
+
+---
+
 ## [1.4.1] -- 2026-11-16
 
 ### Added

@@ -75,7 +75,7 @@ function makeChrome(window, state, bus) {
     runtime: {
       id: "inboxsort-matrix",
       lastError: null,
-      getManifest: () => ({ version: "1.4.1" }),
+      getManifest: () => ({ version: "1.4.2" }),
       onMessage: { addListener(listener) { runtimeListeners.push(listener); } }
     },
     storage: {
@@ -131,7 +131,7 @@ async function createApp(url = "https://mail.google.com/mail/u/0/#inbox", option
     row("star-new", "Gamma", "Aug 28, 2026, 10:00 AM", { starred: true, unread: true, height: 40 })
   ].join("");
   const dom = new JSDOM(
-    `<!doctype html><html><body><div gh="tm">${options.toolbarHtml || ""}</div><div role="main"><table><tbody>${rows}</tbody></table></div></body></html>`,
+    `<!doctype html><html><body><div gh="tm">${options.toolbarHtml || ""}</div><div role="main">${options.mainHtml || `<table><tbody>${rows}</tbody></table>`}</div></body></html>`,
     { url, runScripts: "outside-only", pretendToBeVisual: true }
   );
   const { window } = dom;
@@ -555,6 +555,115 @@ async function run() {
   pauseApp.window.dispatchEvent(new pauseApp.window.Event("beforeunload"));
   pauseApp.dom.window.close();
   pass("sorting while paused keeps grouping on");
+
+  const moved = (w) => [...w.document.querySelectorAll("tr.zA")].filter((r) => /translateY\((?!0px)/.test(r.style.transform)).length;
+
+  // Regression: a manual sort in search results must not leave rows moved
+  // but "unsorted" after opening a thread and coming back.
+  const searchApp = await createApp("https://mail.google.com/mail/u/0/#search/invoice");
+  const sdoc = searchApp.window.document;
+  sdoc.querySelector('[data-tab-group="starred"]').click();
+  await wait(400);
+  assert.ok(moved(searchApp.window) > 0);
+  searchApp.window.location.hash = "#search/invoice/FMfcgzQhWBmpNjTMDxspXZdSMcSkPplX";
+  sdoc.querySelector('div[role="main"]').appendChild(sdoc.createElement("span"));
+  await wait(400);
+  searchApp.window.location.hash = "#search/invoice";
+  sdoc.querySelector('div[role="main"]').appendChild(sdoc.createElement("span"));
+  await wait(500);
+  assert.equal(moved(searchApp.window), 0, "rows left translated with no sort bookkeeping");
+  searchApp.window.dispatchEvent(new searchApp.window.Event("beforeunload"));
+  searchApp.dom.window.close();
+  pass("returning to search results never leaves stale row transforms");
+
+  // Regression: when the extension is updated under an open tab, the old
+  // script restores Gmail's order and removes filters.
+  const orphan = await createApp(undefined, { state: { sortMode: "starredFirst", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} } });
+  const odoc = orphan.window.document;
+  odoc.querySelector('[data-stat="starred"]').click();
+  await wait(50);
+  assert.ok(moved(orphan.window) > 0);
+  assert.ok(odoc.querySelectorAll("tr.zA.gmail-sort-dim").length > 0);
+  orphan.window.chrome.runtime.id = undefined;
+  await wait(1700);
+  assert.equal(moved(orphan.window), 0);
+  assert.equal(odoc.querySelectorAll("tr.zA.gmail-sort-dim").length, 0);
+  assert.equal(odoc.querySelectorAll(".gmail-sort-container").length, 0);
+  orphan.window.dispatchEvent(new orphan.window.Event("beforeunload"));
+  orphan.dom.window.close();
+  pass("orphaned script after an extension update restores Gmail's order");
+
+  // Regression: sectioned inboxes sort each table on its own.
+  const sectionHtml = "<table id=\"s1\"><tbody>" +
+    row("a-unstar", "Alpha", "Aug 28, 2026, 11:00 AM") + row("a-star", "Beta", "Aug 27, 2026, 9:00 AM", { starred: true }) +
+    "</tbody></table><table id=\"s2\"><tbody>" +
+    row("b-unstar", "Gamma", "Aug 26, 2026, 11:00 AM") + row("b-star", "Delta", "Aug 25, 2026, 9:00 AM", { starred: true }) +
+    "</tbody></table>";
+  const sectionApp = await createApp(undefined, { mainHtml: sectionHtml });
+  const xdoc = sectionApp.window.document;
+  xdoc.querySelector('[data-tab-group="starred"]').click();
+  await wait(400);
+  const orderIn = (id) => [...xdoc.querySelectorAll(`#${id} tr.zA`)]
+    .map((el) => ({ id: el.dataset.id, top: el.getBoundingClientRect().top })).sort((a, b) => a.top - b.top).map((x) => x.id);
+  assert.deepEqual(orderIn("s1"), ["a-star", "a-unstar"]);
+  assert.deepEqual(orderIn("s2"), ["b-star", "b-unstar"]);
+  for (const el of xdoc.querySelectorAll("tr.zA")) {
+    const shift = Number((/translateY\((-?[\d.]+)px\)/.exec(el.style.transform) || [0, 0])[1]);
+    assert.ok(Math.abs(shift) <= 40, `${el.dataset.id} moved ${shift}px, outside its own section`);
+  }
+  sectionApp.window.dispatchEvent(new sectionApp.window.Event("beforeunload"));
+  sectionApp.dom.window.close();
+  pass("sectioned inboxes sort within each section");
+
+  // Regression: shift-click never selects rows hidden by a filter, and
+  // toggling Group while paused keeps the saved sort.
+  const filterApp = await createApp(undefined, { state: { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} } });
+  const fdoc = filterApp.window.document;
+  for (const cb of fdoc.querySelectorAll('div[role="checkbox"]')) {
+    cb.addEventListener("click", () => cb.setAttribute("aria-checked", cb.getAttribute("aria-checked") === "true" ? "false" : "true"));
+  }
+  fdoc.querySelector('[data-tab-group="starred"]').click(); // star-new, star-old, unstar-new, unstar-old
+  await wait(400);
+  fdoc.querySelector('[data-stat="unread"]').click(); // keeps star-new and unstar-new; dims star-old between them
+  await wait(250);
+  const fcb = (id) => fdoc.querySelector(`tr[data-id="${id}"] div[role="checkbox"]`);
+  fcb("star-new").dispatchEvent(new filterApp.window.MouseEvent("click", { bubbles: true }));
+  fcb("unstar-new").dispatchEvent(new filterApp.window.MouseEvent("click", { bubbles: true, shiftKey: true }));
+  await wait(20);
+  const fchecked = [...fdoc.querySelectorAll("tr.zA")].filter((r) => r.querySelector('div[role="checkbox"]').getAttribute("aria-checked") === "true").map((r) => r.dataset.id).sort();
+  assert.deepEqual(fchecked, ["star-new", "unstar-new"]);
+  pass("shift-click range skips rows hidden by a filter");
+
+  const pausedState = filterApp.state;
+  assert.equal(pausedState.sortMode, "starredFirst");
+  await filterApp.window.chrome._sendMessage({ action: "snoozeSort", minutes: 15 });
+  await wait(30);
+  fdoc.body.dispatchEvent(new filterApp.window.KeyboardEvent("keydown", { bubbles: true, altKey: true, code: "Digit6", key: "6" }));
+  await wait(400);
+  assert.equal(pausedState.sortMode, "starredFirst");
+  assert.equal(pausedState.groupEnabled, true);
+  filterApp.window.dispatchEvent(new filterApp.window.Event("beforeunload"));
+  filterApp.dom.window.close();
+  pass("toggling Group while paused keeps the saved sort");
+
+  // Regression: Gmail swaps the whole main area on a label switch and then
+  // goes quiet. The saved sort must still be applied to the new list.
+  const swapState = { sortMode: "starredFirst", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const swapApp = await createApp(undefined, { state: swapState });
+  const wdoc = swapApp.window.document;
+  await wait(300);
+  const newMain = wdoc.createElement("div");
+  newMain.setAttribute("role", "main");
+  newMain.innerHTML = "<table><tbody>" +
+    row("n-unstar", "Kilo", "Aug 28, 2026, 11:00 AM") + row("n-star", "Lima", "Aug 20, 2026, 9:00 AM", { starred: true }) +
+    "</tbody></table>";
+  swapApp.window.location.hash = "#label/Work";
+  wdoc.querySelector('div[role="main"]').replaceWith(newMain);
+  await wait(2600);
+  assert.deepEqual(visualOrder(swapApp.window).map((x) => x.id), ["n-star", "n-unstar"]);
+  swapApp.window.dispatchEvent(new swapApp.window.Event("beforeunload"));
+  swapApp.dom.window.close();
+  pass("saved sort applies after Gmail swaps the main area on a label switch");
 
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);

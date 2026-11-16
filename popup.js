@@ -754,26 +754,25 @@ try {
 } catch (_) {}
 
 // ── Feedback links ───────────────────────────────────────────
-// Open a pre-filled GitHub issue. Nothing is sent until the user submits it
-// on GitHub, so InboxSort itself still makes no network requests. Only the
-// extension and Chrome versions are included; no email content.
+// Open the shared Netrition feedback form in a new tab. The extension sends
+// nothing itself and needs no permission: the app name, feedback type and
+// version travel in the URL fragment, which the browser never sends to a
+// server. The form stores reports and emails them to the developer.
 
-function buildIssueUrl(kind) {
+const FEEDBACK_URL = "https://feedback.netrition.com/";
+
+function buildFeedbackUrl(kind) {
   let version = "";
-  try { version = chrome.runtime.getManifest().version; } catch (_) { version = "unknown"; }
-  const chromeMatch = /Chrome\/([\d.]+)/.exec(navigator.userAgent || "");
-  const env = "InboxSort " + version + ", Chrome " + (chromeMatch ? chromeMatch[1] : "unknown");
-  const body = kind === "bug"
-    ? "**What happened?**\n\n\n**What did you expect?**\n\n\n**Steps to reproduce**\n1. \n\n_" + env + "_\n\nPlease do not paste email content or addresses."
-    : "**Your idea**\n\n\n**What would it help you do?**\n\n\n_" + env + "_";
-  const title = kind === "bug" ? "Problem: " : "Idea: ";
-  return "https://github.com/alex-brecher/InboxSort/issues/new?title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(body);
+  try { version = chrome.runtime.getManifest().version; } catch (_) { version = ""; }
+  const params = new URLSearchParams({ app: "inboxsort", k: kind === "bug" ? "bug" : "idea" });
+  if (version) params.set("p", "v" + version);
+  return FEEDBACK_URL + "#" + params.toString();
 }
 
 const suggestLink = document.getElementById("suggestLink");
 const reportLink = document.getElementById("reportLink");
-if (suggestLink) suggestLink.href = buildIssueUrl("idea");
-if (reportLink) reportLink.href = buildIssueUrl("bug");
+if (suggestLink) suggestLink.href = buildFeedbackUrl("idea");
+if (reportLink) reportLink.href = buildFeedbackUrl("bug");
 
 // Surface connection state without inserting layout-shifting content.
 // Say "Open Gmail" right away on other tabs; on a Gmail tab keep "Checking

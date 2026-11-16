@@ -1,6 +1,6 @@
 # InboxSort -- Privacy Policy
 
-*Last updated: March 7, 2026*
+*Last updated: November 16, 2026*
 
 ## Overview
 
@@ -41,12 +41,18 @@ InboxSort stores your preferences (sort order, accent color, toggle states, per-
 
 ## What InboxSort Does NOT Do
 
-- **No external network requests.** InboxSort makes zero HTTP requests to any server. It does not phone home, ping analytics endpoints, or communicate with any external service.
+- **No external network requests.** The extension makes zero HTTP requests to any server. It does not phone home, ping analytics endpoints, or communicate with any external service. (The optional feedback form below is a separate web page you open yourself.)
 - **No analytics or tracking.** There is no Google Analytics, Mixpanel, Segment, or any other tracking tool embedded in InboxSort.
 - **No telemetry.** Usage patterns, feature usage, error reports, and crash data are not collected.
 - **No third-party scripts.** InboxSort contains no third-party libraries, SDKs, or dependencies. All code is first-party.
 - **No data sharing.** Your information is never sold, rented, shared, or disclosed to any third party.
 - **No email modification.** InboxSort does not move, delete, archive, label, mark, or modify any email. All sorting and filtering is purely visual, using CSS transforms to reorder how emails appear on screen. Your actual Gmail inbox remains untouched.
+
+## Optional Feedback Form
+
+The popup has **Suggest an idea** and **Report a problem** links. They open a feedback form at `https://feedback.netrition.com` in a new browser tab. InboxSort itself sends nothing to that page except the extension name, the version number and the type of feedback, which are placed in the page address fragment (the part after `#`, which browsers do not send to servers).
+
+Anything you type or attach on that form is sent only when you click Send. Reports are stored by the developer on Cloudflare and emailed to the developer through SparkPost. They are used only to read, answer and act on your feedback. They are not sold or shared for advertising. Do not include email contents, addresses or other personal details that you do not want to share. To ask for a report to be deleted, open an issue at https://github.com/alex-brecher/InboxSort.
 
 ## Permissions Explained
 
