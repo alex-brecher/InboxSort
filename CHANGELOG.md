@@ -5,6 +5,14 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.4.2] -- 2026-11-16
+
+### Changed
+- Suggest an idea and Report a problem now open the Netrition feedback form instead of GitHub. Reporters need no GitHub account and reports stay private. They are saved and emailed to the developer. The extension still makes no network requests: the app name, version and feedback type travel in the URL fragment.
+- Privacy policy, store description and README describe the optional form and what it collects.
+
+---
+
 ## [1.4.1] -- 2026-11-16
 
 ### Added

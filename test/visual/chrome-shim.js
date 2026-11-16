@@ -25,7 +25,7 @@
     };
   }
   window.chrome = {
-    runtime: { id: "visual", lastError: null, getManifest: () => ({ version: "1.4.1" }), onMessage: { addListener: (f) => msgListeners.push(f) } },
+    runtime: { id: "visual", lastError: null, getManifest: () => ({ version: "1.4.2" }), onMessage: { addListener: (f) => msgListeners.push(f) } },
     storage: {
       sync: { get: (k, cb) => setTimeout(() => cb(subset(k)), 0), set: setter("sync") },
       local: { get: (k, cb) => setTimeout(() => cb(subset(k)), 0), set: setter("local") },

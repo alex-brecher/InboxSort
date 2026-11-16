@@ -134,7 +134,7 @@ InboxSort does **not** request `identity`, `cookies`, `history`, `bookmarks`, `d
 
 ## Version
 
-**v1.4.1** - See [CHANGELOG.md](CHANGELOG.md) for release history.
+**v1.4.2** - See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
 
@@ -146,7 +146,9 @@ This project is provided for personal use. All rights reserved.
 
 ## Feedback
 
-Use **Suggest an idea** or **Report a problem** at the bottom of the popup. Each opens a pre-filled GitHub issue. Please do not paste email content or addresses.
+Use **Suggest an idea** or **Report a problem** at the bottom of the popup. Each opens the shared Netrition feedback form (`https://feedback.netrition.com`, app `inboxsort`) in a new tab. The extension name, version and feedback type travel in the URL fragment, so the extension itself still makes no network request. Reports are saved and emailed to the developer, who triages them on the form's admin page. Please do not paste email content or addresses.
+
+The form's source lives in `alex-brecher/workspace` at `shared/feedback-widget/hub`.
 
 ---
 

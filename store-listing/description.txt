@@ -65,3 +65,6 @@ PERMISSIONS:
 • storage: Saves and syncs your InboxSort preferences
 
 InboxSort does not collect or transmit personal data. InboxSort processes the visible message list in your browser.
+
+FEEDBACK:
+• Suggest an idea or Report a problem from the popup. These open an optional web form in a new tab; nothing is sent unless you click Send there.

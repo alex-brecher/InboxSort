@@ -55,7 +55,7 @@ async function createPopup(options = {}) {
     runtime: {
       id: "inboxsort-popup",
       lastError: null,
-      getManifest: () => ({ version: "1.4.1" })
+      getManifest: () => ({ version: "1.4.2" })
     },
     storage: {
       sync: {
@@ -114,7 +114,7 @@ async function run() {
   assert.equal(doc.querySelector('[data-filter="starred"]').getAttribute("aria-pressed"), "true");
   assert.equal(doc.querySelector("#snoozeStatus").classList.contains("visible"), true);
   assert.match(doc.querySelector("#snoozeStatusText").textContent, /12m remaining/);
-  assert.equal(doc.querySelector("#inboxsort-version").textContent, "InboxSort v1.4.1");
+  assert.equal(doc.querySelector("#inboxsort-version").textContent, "InboxSort v1.4.2");
   pass("live Gmail state and version rendering");
 
   const toolbarToggle = doc.querySelector("#toggleTabVis");
@@ -157,13 +157,15 @@ async function run() {
 
   const suggest = new URL(doc.querySelector("#suggestLink").href);
   const report = new URL(doc.querySelector("#reportLink").href);
-  assert.equal(suggest.origin + suggest.pathname, "https://github.com/alex-brecher/InboxSort/issues/new");
-  assert.match(suggest.searchParams.get("title"), /^Idea: /);
-  assert.match(suggest.searchParams.get("body"), /InboxSort 1\.4\.\d/);
-  assert.match(report.searchParams.get("title"), /^Problem: /);
-  assert.match(report.searchParams.get("body"), /Steps to reproduce/);
+  assert.equal(suggest.origin + suggest.pathname, "https://feedback.netrition.com/");
+  assert.equal(suggest.search, "");
+  const sp = new URLSearchParams(suggest.hash.slice(1));
+  assert.equal(sp.get("app"), "inboxsort");
+  assert.equal(sp.get("k"), "idea");
+  assert.match(sp.get("p"), /^v1\.4\.\d+$/);
+  assert.equal(new URLSearchParams(report.hash.slice(1)).get("k"), "bug");
   assert.equal(doc.querySelector("#suggestLink").target, "_blank");
-  pass("suggest and report links open a pre-filled GitHub issue");
+  pass("suggest and report links open the shared feedback form with context in the fragment");
 
   const reset = doc.querySelector("#resetBtn");
   reset.click();
