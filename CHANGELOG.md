@@ -17,12 +17,13 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 - Rows no longer stay overlapped after archiving two emails quickly.
 - Group-by-sender colors no longer disappear after about two minutes, and they follow the theme and accent color.
 - Settings could stop saving for good once "Remember per label" had stored many labels. Label memory is now capped well under Chrome's sync limit.
+- Choosing a sort while sorting was paused saved Group by sender as off. Grouping now stays on.
 - The / and ? shortcuts no longer take over Gmail's own shortcuts inside an open email.
 - Background re-sorts no longer write to Chrome sync storage on every page load and resize.
 
 ### Changed
 - Split the content script into smaller files (shared, icons, rows, views, core) with no build step, and shared constants with the popup.
-- Added ESLint (`npm run lint`) and 10 new regression tests (40 total).
+- Added ESLint (`npm run lint`) and 11 new regression tests (41 total).
 
 ---
 

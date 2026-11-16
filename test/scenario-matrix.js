@@ -443,6 +443,18 @@ async function run() {
   await wait(20);
   const checked = [...rdoc.querySelectorAll('tr.zA')].filter((r) => r.querySelector('div[role="checkbox"]').getAttribute("aria-checked") === "true").map((r) => r.dataset.id).sort();
   assert.deepEqual(checked, ["star-new", "star-old"]);
+  // A swapped row clears the anchor; the next shift-click toggles only itself
+  // instead of falling through to Gmail's DOM-order range.
+  const swappedRow = rdoc.querySelector('tr[data-id="unstar-old"]');
+  const swapClone = swappedRow.cloneNode(true);
+  swappedRow.replaceWith(swapClone);
+  const swapCb = swapClone.querySelector('div[role="checkbox"]');
+  swapCb.addEventListener("click", () => swapCb.setAttribute("aria-checked", swapCb.getAttribute("aria-checked") === "true" ? "false" : "true"));
+  await wait(900);
+  cbFor("unstar-new").dispatchEvent(new rangeApp.window.MouseEvent("click", { bubbles: true, shiftKey: true }));
+  await wait(20);
+  const checkedAfter = [...rdoc.querySelectorAll('tr.zA')].filter((r) => r.querySelector('div[role="checkbox"]').getAttribute("aria-checked") === "true").map((r) => r.dataset.id).sort();
+  assert.deepEqual(checkedAfter, ["star-new", "star-old", "unstar-new"]);
   // "/" and "?" must not be captured where the toolbar is hidden.
   rangeApp.window.location.hash = "#inbox/FMfcgzQhWBmpNjTMDxspXZdSMcSkPplX";
   rdoc.querySelector('div[role="main"]').appendChild(rdoc.createElement("span"));
@@ -527,6 +539,22 @@ async function run() {
   fullPage.window.dispatchEvent(new fullPage.window.Event("beforeunload"));
   fullPage.dom.window.close();
   pass("page-size helper appears only below 100 per page");
+
+  // Regression: choosing a sort while paused must not save grouping as off.
+  const pauseState = { sortMode: "newest", groupEnabled: true, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const pauseApp = await createApp(undefined, { state: pauseState });
+  await pauseApp.window.chrome._sendMessage({ action: "snoozeSort", minutes: 15 });
+  await wait(30);
+  pauseApp.window.document.querySelector('[data-tab-group="sender"]').click();
+  await wait(400);
+  assert.equal(pauseState.groupEnabled, true);
+  assert.equal(pauseState.sortMode, "senderAZ");
+  const resumed = await pauseApp.window.chrome._sendMessage({ action: "getState" });
+  assert.equal(resumed.isSnoozed, false);
+  assert.equal(resumed.groupEnabled, true);
+  pauseApp.window.dispatchEvent(new pauseApp.window.Event("beforeunload"));
+  pauseApp.dom.window.close();
+  pass("sorting while paused keeps grouping on");
 
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);

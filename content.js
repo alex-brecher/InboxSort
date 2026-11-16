@@ -178,6 +178,8 @@
   let _resizeDebounce      = null;  // Debounce timer for viewport resize re-sort
   let _lastResizeWidth     = 0;     // Track viewport width to ignore height-only resizes
   let _initialized         = false; // Prevent duplicate timers and observers
+  let _selectAnchorRow     = null;  // Last plain-clicked row, for visual shift-click ranges
+  let _programmaticCheckboxClick = false; // our own range / bulk clicks keep the anchor
 
   let EXCLUDED_LABELS = { "sent": true, "all": true };
 
@@ -236,7 +238,7 @@
   }
 
   function isStorageSizeError(msg) {
-    return /quota_bytes|quota exceeded|bytes/i.test(String(msg || "")) && !isStorageQuotaError(msg);
+    return /QUOTA_BYTES/i.test(String(msg || ""));
   }
 
   // Most recently used labels last; oldest dropped first.
@@ -757,6 +759,9 @@
   // Full invalidation — also clears metadata and td cache.
   // Use only on navigation when rows are actually replaced.
   function fullInvalidateRowCache() {
+    // Gmail may reuse a row element for a different email; a stale anchor
+    // would make the next shift-click start from the wrong row.
+    _selectAnchorRow = null;
     _rowCache = null;
     _rowCacheTime = 0;
     _rowMeta = new WeakMap();
@@ -1433,9 +1438,13 @@
     _suppressObserver = true;
     try {
 
-    // Cancel snooze if user explicitly changes sort during snooze
+    // Cancel snooze if user explicitly changes sort during snooze. Pausing
+    // hides grouping without changing the saved choice, so bring it back
+    // before this sort is saved; otherwise grouping is silently lost.
     if (!silent && isSnoozedActive()) {
+      let groupBeforePause = !!snoozedGroup;
       cancelSnooze(false);
+      groupEnabled = groupBeforePause;
     }
 
     clearSortTransforms();
@@ -1892,8 +1901,6 @@
   // archive or delete would then hit the wrong emails. While a sort or group
   // is active, InboxSort selects the range the user actually sees instead.
 
-  let _selectAnchorRow = null;
-  let _programmaticCheckboxClick = false; // our own range / bulk clicks keep the anchor
 
   function isSortVisuallyActive() {
     return !isSnoozedActive() && (currentSort !== "newest" || groupEnabled) && _lastSortedRowCount > 0;
@@ -1948,14 +1955,21 @@
   function onCheckboxPointer(e) {
     if (_contextInvalid || !e.shiftKey || !isSortVisuallyActive()) return;
     let hit = checkboxRowFromEvent(e);
-    if (!hit || !_selectAnchorRow || !_selectAnchorRow.isConnected || _selectAnchorRow === hit.row) return;
+    if (!hit) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (e.type === "click") {
-      if (selectVisualRange(_selectAnchorRow, hit.row)) _selectAnchorRow = hit.row;
-      _lastStatsKey = "";
-      setTimeout(updateStats, 50);
+    if (e.type !== "click") return;
+    let anchorOk = _selectAnchorRow && _selectAnchorRow.isConnected && _selectAnchorRow !== hit.row &&
+      selectVisualRange(_selectAnchorRow, hit.row);
+    if (!anchorOk) {
+      // No usable anchor: toggle just this row rather than letting Gmail
+      // select a range in its hidden order.
+      _programmaticCheckboxClick = true;
+      try { hit.checkbox.click(); } finally { _programmaticCheckboxClick = false; }
     }
+    _selectAnchorRow = hit.row;
+    _lastStatsKey = "";
+    setTimeout(updateStats, 50);
   }
 
   function rememberSelectAnchor(e) {
