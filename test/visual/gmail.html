@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InboxSort visual check: Gmail toolbar</title>
+  <link rel="stylesheet" href="../../styles.css">
+  <style>
+    body { margin: 0; font-family: Roboto, Arial, sans-serif; font-size: 14px; background: #f6f8fc; color: #202124; }
+    body.gmail-dark { background: #1f1f1f; color: #e3e3e3; }
+    div[gh="tm"] { height: 48px; display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+    .Dj { margin-left: auto; color: #5f6368; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    tr.zA { height: 40px; background: #fff; position: relative; }
+    body.gmail-dark tr.zA { background: #2d2e30; }
+    tr.zA.zE { font-weight: 700; }
+    tr.zA td { padding: 0 8px; border-bottom: 1px solid rgba(0,0,0,.06); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    td.cb { width: 28px; } td.apU { width: 28px; } td.snd { width: 180px; } td.dt { width: 110px; text-align: right; }
+    .T-KT-Jp::before { content: "\2605"; color: #f4b400; }
+    .T-KT:not(.T-KT-Jp)::before { content: "\2606"; color: #9aa0a6; }
+    @media (max-width: 600px) { td.snd { width: 110px; } td.dt { width: 70px; } }
+  </style>
+</head>
+<body>
+  <div gh="tm"><span>Gmail toolbar</span><span class="Dj">1&ndash;50 of 197</span></div>
+  <div role="main"><table><tbody id="rows"></tbody></table></div>
+  <script src="chrome-shim.js"></script>
+  <script>
+    if (new URLSearchParams(location.search).get("gmail") === "dark") document.body.classList.add("gmail-dark");
+    const senders = ["Amazon", "Shopify", "Stripe", "Alex Brecher", "GitHub", "Amazon", "Klaviyo", "Shopify", "Fulfil", "Stripe", "Amazon", "Google"];
+    const rows = [];
+    for (let i = 0; i < 24; i++) {
+      const s = senders[i % senders.length];
+      const d = new Date(2026, 10, 16 - Math.floor(i / 2), 9 + (i % 9), 5);
+      const title = d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+      rows.push('<tr class="zA' + (i % 3 === 0 ? " zE" : "") + '"><td class="cb"><div role="checkbox" aria-checked="false"></div></td>' +
+        '<td class="apU"><span class="T-KT' + (i % 5 === 0 ? " T-KT-Jp" : "") + '" aria-label="' + (i % 5 === 0 ? "Starred" : "Not starred") + '"></span></td>' +
+        '<td class="snd"><span class="bA4"><span class="zF" name="' + s + '">' + s + '</span></span></td>' +
+        '<td><span class="bog">Order update ' + (i + 1) + '</span> <span class="y2">- snippet text for row ' + (i + 1) + '</span>' + (i % 4 === 0 ? '<span class="aZo"></span>' : '') + '</td>' +
+        '<td class="dt"><span title="' + title + '">' + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + '</span></td></tr>');
+    }
+    document.getElementById("rows").innerHTML = rows.join("");
+  </script>
+  <script src="../../shared.js"></script>
+  <script src="../../content-icons.js"></script>
+  <script src="../../content-rows.js"></script>
+  <script src="../../content-views.js"></script>
+  <script src="../../content.js"></script>
+</body>
+</html>

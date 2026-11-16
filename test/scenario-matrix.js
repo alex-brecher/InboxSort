@@ -3,7 +3,11 @@ const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 
 const root = require("node:path").join(__dirname, "..");
-const source = fs.readFileSync(require("node:path").join(root, "content.js"), "utf8");
+// Load the content scripts exactly as the manifest lists them, in order.
+const manifest = JSON.parse(fs.readFileSync(require("node:path").join(root, "manifest.json"), "utf8"));
+const source = manifest.content_scripts[0].js
+  .map((file) => fs.readFileSync(require("node:path").join(root, file), "utf8"))
+  .join("\n;\n");
 const styles = fs.readFileSync(require("node:path").join(root, "styles.css"), "utf8");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,7 +75,7 @@ function makeChrome(window, state, bus) {
     runtime: {
       id: "inboxsort-matrix",
       lastError: null,
-      getManifest: () => ({ version: "1.3.2" }),
+      getManifest: () => ({ version: "1.4.0" }),
       onMessage: { addListener(listener) { runtimeListeners.push(listener); } }
     },
     storage: {
@@ -127,19 +131,25 @@ async function createApp(url = "https://mail.google.com/mail/u/0/#inbox", option
     row("star-new", "Gamma", "Aug 28, 2026, 10:00 AM", { starred: true, unread: true, height: 40 })
   ].join("");
   const dom = new JSDOM(
-    `<!doctype html><html><body><div gh="tm"></div><div role="main"><table><tbody>${rows}</tbody></table></div></body></html>`,
+    `<!doctype html><html><body><div gh="tm">${options.toolbarHtml || ""}</div><div role="main"><table><tbody>${rows}</tbody></table></div></body></html>`,
     { url, runScripts: "outside-only", pretendToBeVisual: true }
   );
   const { window } = dom;
   installLayout(window);
-  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const media = { matches: !!options.systemDark, listeners: [] };
+  window.matchMedia = () => ({
+    get matches() { return media.matches; },
+    addEventListener(_type, fn) { media.listeners.push(fn); },
+    removeEventListener() {}
+  });
   const state = options.state || { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
   const bus = options.bus || { listeners: [] };
   window.chrome = makeChrome(window, state, bus);
   window.eval(source);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   await wait(700);
-  return { dom, window, state, bus };
+  const setSystemDark = (on) => { media.matches = on; media.listeners.forEach((fn) => fn({ matches: on })); };
+  return { dom, window, state, bus, setSystemDark };
 }
 
 function visualOrder(window) {
@@ -267,6 +277,16 @@ async function run() {
   assert.equal(doc.querySelectorAll('tr[data-id="star-old"]').length, 0);
   pass("row removal during active sort");
 
+  // Regression: a second archive inside the re-sort throttle window must
+  // still be re-sorted, otherwise rows stay overlapped.
+  doc.querySelector('tr[data-id="unstar-new"]').remove();
+  await wait(300);
+  doc.querySelector('tr[data-id="star-latest"]').remove();
+  await wait(1200);
+  assertNoOverlap(visualOrder(window));
+  assert.equal(visualOrder(window)[0].top, 0);
+  pass("back-to-back archives inside the throttle window re-sort");
+
   for (let i = 0; i < 8; i++) {
     doc.querySelector('[data-tab-group="sender"]').click();
   }
@@ -391,6 +411,150 @@ async function run() {
   firstTab.dom.window.close();
   secondTab.dom.window.close();
   pass("sort changes synchronize across open Gmail tabs");
+
+  // Regression: with Oldest saved, opening page 1 must not bounce to the last page.
+  const pagedState = { sortMode: "oldest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const paged = await createApp(undefined, { state: pagedState, toolbarHtml: '<span class="Dj">1–100 of 197</span>' });
+  await wait(300);
+  assert.equal(paged.window.location.hash, "#inbox");
+  assert.deepEqual(visualOrder(paged.window).map((x) => x.id), ["unstar-old", "star-old", "star-new", "unstar-new"]);
+  assert.equal(pagedState.sortMode, "oldest");
+  paged.window.document.querySelector('[data-tab-group="date"]').click();
+  await wait(20);
+  paged.window.document.querySelector('[data-tab-group="date"]').click();
+  await wait(20);
+  assert.equal(paged.window.location.hash, "#inbox/p2");
+  paged.window.dispatchEvent(new paged.window.Event("beforeunload"));
+  paged.dom.window.close();
+  pass("saved Oldest sorts the current page and only jumps when chosen");
+
+  // Regression: shift-click selects the range the user sees, not DOM order.
+  const rangeApp = await createApp();
+  const rdoc = rangeApp.window.document;
+  for (const cb of rdoc.querySelectorAll('div[role="checkbox"]')) {
+    cb.addEventListener("click", () => cb.setAttribute("aria-checked", cb.getAttribute("aria-checked") === "true" ? "false" : "true"));
+  }
+  rdoc.querySelector('[data-tab-group="starred"]').click();
+  await wait(300);
+  // Visual order: star-new, star-old, unstar-new, unstar-old. DOM order differs.
+  const cbFor = (id) => rdoc.querySelector(`tr[data-id="${id}"] div[role="checkbox"]`);
+  cbFor("star-new").dispatchEvent(new rangeApp.window.MouseEvent("click", { bubbles: true }));
+  cbFor("star-old").dispatchEvent(new rangeApp.window.MouseEvent("click", { bubbles: true, shiftKey: true }));
+  await wait(20);
+  const checked = [...rdoc.querySelectorAll('tr.zA')].filter((r) => r.querySelector('div[role="checkbox"]').getAttribute("aria-checked") === "true").map((r) => r.dataset.id).sort();
+  assert.deepEqual(checked, ["star-new", "star-old"]);
+  // A swapped row clears the anchor; the next shift-click toggles only itself
+  // instead of falling through to Gmail's DOM-order range.
+  const swappedRow = rdoc.querySelector('tr[data-id="unstar-old"]');
+  const swapClone = swappedRow.cloneNode(true);
+  swappedRow.replaceWith(swapClone);
+  const swapCb = swapClone.querySelector('div[role="checkbox"]');
+  swapCb.addEventListener("click", () => swapCb.setAttribute("aria-checked", swapCb.getAttribute("aria-checked") === "true" ? "false" : "true"));
+  await wait(900);
+  cbFor("unstar-new").dispatchEvent(new rangeApp.window.MouseEvent("click", { bubbles: true, shiftKey: true }));
+  await wait(20);
+  const checkedAfter = [...rdoc.querySelectorAll('tr.zA')].filter((r) => r.querySelector('div[role="checkbox"]').getAttribute("aria-checked") === "true").map((r) => r.dataset.id).sort();
+  assert.deepEqual(checkedAfter, ["star-new", "star-old", "unstar-new"]);
+  // "/" and "?" must not be captured where the toolbar is hidden.
+  rangeApp.window.location.hash = "#inbox/FMfcgzQhWBmpNjTMDxspXZdSMcSkPplX";
+  rdoc.querySelector('div[role="main"]').appendChild(rdoc.createElement("span"));
+  await wait(400);
+  const slash = new rangeApp.window.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "/" });
+  rdoc.body.dispatchEvent(slash);
+  assert.equal(slash.defaultPrevented, false);
+  const help = new rangeApp.window.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "?" });
+  rdoc.body.dispatchEvent(help);
+  assert.equal(help.defaultPrevented, false);
+  assert.equal(rdoc.querySelector(".gmail-sort-cheatsheet"), null);
+  rangeApp.window.dispatchEvent(new rangeApp.window.Event("beforeunload"));
+  rangeApp.dom.window.close();
+  pass("shift-click range follows visual order and hidden toolbar leaves / and ? to Gmail");
+
+  // Appearance: System follows the OS live; Light and Dark override it.
+  const themeState = { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const themeApp = await createApp(undefined, { state: themeState, systemDark: true });
+  const tdoc = themeApp.window.document;
+  const isDark = () => tdoc.documentElement.classList.contains("gmail-sort-dark-mode") && tdoc.querySelector(".gmail-sort-container").classList.contains("gmail-sort-dark");
+  assert.equal(isDark(), true);
+  assert.equal(tdoc.documentElement.style.getPropertyValue("--sort-accent"), "#8ab4f8");
+  themeApp.setSystemDark(false);
+  assert.equal(tdoc.documentElement.classList.contains("gmail-sort-dark-mode"), false);
+  assert.equal(tdoc.documentElement.style.getPropertyValue("--sort-accent"), "#1a73e8");
+  themeApp.window.chrome.storage.sync.set({ appearance: "dark" });
+  assert.equal(isDark(), true);
+  themeApp.setSystemDark(false);
+  assert.equal(isDark(), true);
+  await themeApp.window.chrome._sendMessage({ action: "setAppearance", appearance: "light" });
+  assert.equal(tdoc.documentElement.classList.contains("gmail-sort-dark-mode"), false);
+  assert.equal((await themeApp.window.chrome._sendMessage({ action: "getState" })).appearance, "light");
+  pass("appearance follows system live and Light/Dark override it");
+
+  // Group marks are data attributes and are re-applied when Gmail swaps a row.
+  themeApp.window.document.body.dispatchEvent(new themeApp.window.KeyboardEvent("keydown", { bubbles: true, altKey: true, code: "Digit6", key: "6" }));
+  await wait(100);
+  const marked = () => [...tdoc.querySelectorAll("tr.zA")].filter((r) => r.hasAttribute("data-inboxsort-group")).length;
+  assert.equal(marked(), 4);
+  assert.equal(tdoc.querySelectorAll('[data-inboxsort-group-start="first"]').length, 1);
+  const swapped = tdoc.querySelector('tr[data-id="star-new"]'); // 4th DOM row: outside the old first-3 check
+  const fresh = swapped.cloneNode(true);
+  for (const attr of ["data-inboxsort-group", "data-inboxsort-group-start", "data-sort-group", "style"]) fresh.removeAttribute(attr);
+  swapped.replaceWith(fresh);
+  await wait(900);
+  assert.ok(fresh.hasAttribute("data-inboxsort-group"));
+  assert.equal(marked(), 4);
+  assertNoOverlap(visualOrder(themeApp.window));
+  assert.match(styles, /tr\.zA\[data-inboxsort-group="even"\]/);
+  themeApp.window.dispatchEvent(new themeApp.window.Event("beforeunload"));
+  themeApp.dom.window.close();
+  pass("group marks survive Gmail swapping a row element");
+
+  // Regression: per-label memory is pruned so it can never outgrow sync's 8 KB item limit.
+  const manyPrefs = {};
+  for (let i = 0; i < 120; i++) manyPrefs["label/Project-" + i + "-" + "x".repeat(40)] = "senderAZ";
+  const prefsState = { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: true, accentColor: "blue", hiddenTabs: {}, labelPrefs: manyPrefs };
+  const prefsApp = await createApp(undefined, { state: prefsState });
+  prefsApp.window.document.querySelector('[data-tab-group="starred"]').click();
+  await wait(400);
+  const savedKeys = Object.keys(prefsState.labelPrefs);
+  assert.ok(savedKeys.length <= 60, `kept ${savedKeys.length} labels`);
+  assert.ok(JSON.stringify(prefsState.labelPrefs).length <= 6000);
+  assert.equal(savedKeys[savedKeys.length - 1], "inbox");
+  assert.equal(prefsState.labelPrefs.inbox, "starredFirst");
+  assert.equal(prefsState.sortMode, "starredFirst");
+  prefsApp.window.dispatchEvent(new prefsApp.window.Event("beforeunload"));
+  prefsApp.dom.window.close();
+  pass("per-label sort memory is pruned under the sync item limit");
+
+  // Page-size helper: offered only when Gmail shows fewer than 100 per page.
+  const smallPage = await createApp(undefined, { toolbarHtml: '<span class="Dj">1–50 of 197</span>' });
+  const pageBtn = smallPage.window.document.querySelector('[data-action="page-size"]');
+  assert.ok(pageBtn, "page-size button shown at 50 per page");
+  assert.match(smallPage.window.document.querySelector('[data-stat="total"]').title, /1–50 of 197/);
+  pageBtn.click();
+  assert.equal(smallPage.window.location.hash, "#settings/general");
+  smallPage.window.dispatchEvent(new smallPage.window.Event("beforeunload"));
+  smallPage.dom.window.close();
+  const fullPage = await createApp(undefined, { toolbarHtml: '<span class="Dj">1–100 of 197</span>' });
+  assert.equal(fullPage.window.document.querySelector('[data-action="page-size"]'), null);
+  fullPage.window.dispatchEvent(new fullPage.window.Event("beforeunload"));
+  fullPage.dom.window.close();
+  pass("page-size helper appears only below 100 per page");
+
+  // Regression: choosing a sort while paused must not save grouping as off.
+  const pauseState = { sortMode: "newest", groupEnabled: true, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const pauseApp = await createApp(undefined, { state: pauseState });
+  await pauseApp.window.chrome._sendMessage({ action: "snoozeSort", minutes: 15 });
+  await wait(30);
+  pauseApp.window.document.querySelector('[data-tab-group="sender"]').click();
+  await wait(400);
+  assert.equal(pauseState.groupEnabled, true);
+  assert.equal(pauseState.sortMode, "senderAZ");
+  const resumed = await pauseApp.window.chrome._sendMessage({ action: "getState" });
+  assert.equal(resumed.isSnoozed, false);
+  assert.equal(resumed.groupEnabled, true);
+  pauseApp.window.dispatchEvent(new pauseApp.window.Event("beforeunload"));
+  pauseApp.dom.window.close();
+  pass("sorting while paused keeps grouping on");
 
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);

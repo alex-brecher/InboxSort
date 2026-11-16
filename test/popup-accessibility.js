@@ -5,7 +5,8 @@ const { JSDOM } = require("jsdom");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "popup.html"), "utf8");
-const source = fs.readFileSync(path.join(root, "popup.js"), "utf8");
+const source = fs.readFileSync(path.join(root, "shared.js"), "utf8") + "\n;\n" +
+  fs.readFileSync(path.join(root, "popup.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "popup.css"), "utf8");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,12 +50,12 @@ async function createPopup(options = {}) {
     return { ...keys, ...Object.fromEntries(Object.keys(keys).filter((key) => key in storage).map((key) => [key, storage[key]])) };
   }
 
-  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  window.matchMedia = () => ({ matches: !!options.systemDark, addEventListener() {}, removeEventListener() {} });
   window.chrome = {
     runtime: {
       id: "inboxsort-popup",
       lastError: null,
-      getManifest: () => ({ version: "1.3.2" })
+      getManifest: () => ({ version: "1.4.0" })
     },
     storage: {
       sync: {
@@ -113,7 +114,7 @@ async function run() {
   assert.equal(doc.querySelector('[data-filter="starred"]').getAttribute("aria-pressed"), "true");
   assert.equal(doc.querySelector("#snoozeStatus").classList.contains("visible"), true);
   assert.match(doc.querySelector("#snoozeStatusText").textContent, /12m remaining/);
-  assert.equal(doc.querySelector("#inboxsort-version").textContent, "InboxSort v1.3.2");
+  assert.equal(doc.querySelector("#inboxsort-version").textContent, "InboxSort v1.4.0");
   pass("live Gmail state and version rendering");
 
   const toolbarToggle = doc.querySelector("#toggleTabVis");
@@ -142,6 +143,18 @@ async function run() {
   assert.equal(doc.querySelectorAll('.sort-option[aria-checked="true"]').length, 1);
   pass("sort interaction keeps storage, Gmail, and ARIA in sync");
 
+  assert.equal(doc.querySelector("#appearancePicker").getAttribute("role"), "radiogroup");
+  assert.equal(doc.querySelector('[data-appearance="system"]').getAttribute("aria-checked"), "true");
+  assert.equal(doc.documentElement.getAttribute("data-theme"), "light");
+  doc.querySelector('[data-appearance="dark"]').click();
+  await wait(10);
+  assert.equal(storage.appearance, "dark");
+  assert.equal(doc.documentElement.getAttribute("data-theme"), "dark");
+  assert.equal(doc.querySelectorAll('.segmented-btn[aria-checked="true"]').length, 1);
+  assert.match(css, /html\[data-theme="dark"\] \{/);
+  assert.doesNotMatch(css, /@media \(prefers-color-scheme: dark\)/);
+  pass("appearance picker saves the mode and themes the popup");
+
   const reset = doc.querySelector("#resetBtn");
   reset.click();
   assert.equal(reset.classList.contains("armed"), true);
@@ -151,6 +164,7 @@ async function run() {
   assert.equal(storage.sortMode, "newest");
   assert.equal(storage.groupEnabled, false);
   assert.equal(storage.snoozeState, null);
+  assert.equal(storage.appearance, "system");
   pass("destructive reset requires a second click");
 
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
@@ -158,12 +172,20 @@ async function run() {
   assert.doesNotMatch(css, /cubic-bezier\(0\.34,\s*1\.56/);
   pass("visual system avoids gradients and bounce motion");
 
-  window.dispatchEvent(new window.Event("unload"));
+  window.dispatchEvent(new window.Event("pagehide"));
   popup.dom.window.close();
+
+  const darkSystem = await createPopup({ systemDark: true, storage: { appearance: "system" } });
+  assert.equal(darkSystem.window.document.documentElement.getAttribute("data-theme"), "dark");
+  darkSystem.dom.window.close();
+  const forcedLight = await createPopup({ systemDark: true, storage: { appearance: "light" } });
+  assert.equal(forcedLight.window.document.documentElement.getAttribute("data-theme"), "light");
+  forcedLight.dom.window.close();
+  pass("System follows the OS and Light overrides a dark OS");
 
   const disconnected = await createPopup({ gmail: false });
   assert.equal(disconnected.window.document.querySelector("#connectionStatus").textContent, "Open Gmail");
-  disconnected.window.dispatchEvent(new disconnected.window.Event("unload"));
+  disconnected.window.dispatchEvent(new disconnected.window.Event("pagehide"));
   disconnected.dom.window.close();
   pass("non-Gmail tab shows a clear connection state");
 

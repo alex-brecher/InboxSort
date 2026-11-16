@@ -283,9 +283,8 @@
 
 /* ── Dimmed rows (search / filter) ────────────────────── */
 
-/* Only transition dim (filter) rows — group rows must NOT transition
-   because the group-style interval re-applies background-color frequently
-   and any CSS transition on those rows causes visible flashing. */
+/* Only dimmed (filtered) rows transition; group tints switch instantly so a
+   re-sort never fades between colors. */
 tr.zA.gmail-sort-dim {
   transition: opacity 0.2s ease !important;
 }
@@ -471,41 +470,36 @@ tr.zA.gmail-sort-dim {
 
 /* ── Group-by-sender visual clustering ────────────────── */
 
-/* Alternating sender blocks use a low-contrast full-row tint. */
-tr.zA.gmail-sort-group-even {
-  background-color: var(--sort-accent-light, #d2e3fc) !important;
-  box-shadow: none !important;
+/* Rows are marked by content.js with data-inboxsort-group="even|odd" and,
+   on the first row of each sender, data-inboxsort-group-start="first|next".
+   Colors come from the accent variables, which switch with the theme. */
+html {
+  --sort-group-odd-bar: rgba(0, 0, 0, 0.10);
 }
-tr.zA.gmail-sort-group-even > td,
-tr.zA.gmail-sort-group-even td {
+html.gmail-sort-dark-mode {
+  --sort-group-odd-bar: rgba(255, 255, 255, 0.12);
+}
+
+/* Alternating sender blocks: tinted rows with an accent bar. */
+tr.zA[data-inboxsort-group="even"] {
   background-color: var(--sort-accent-light, #d2e3fc) !important;
+  box-shadow: inset 4px 0 0 0 var(--sort-accent, #1a73e8) !important;
+}
+tr.zA[data-inboxsort-group="even"] > td {
   background: var(--sort-accent-light, #d2e3fc) !important;
 }
 
-/* Untinted groups retain Gmail's native background. */
-tr.zA.gmail-sort-group-start:not(.gmail-sort-group-even),
-tr.zA[data-sort-group]:not(.gmail-sort-group-even) {
-  box-shadow: none !important;
+/* Untinted blocks keep Gmail's background with a neutral bar. */
+tr.zA[data-inboxsort-group="odd"] {
+  box-shadow: inset 4px 0 0 0 var(--sort-group-odd-bar) !important;
 }
 
-/* Group boundary: thick top divider on the first row of each group
-   (except the very first group, which doesn't need one).
-   Uses a top shadow instead of a border to avoid layout reflow. */
-tr.zA.gmail-sort-group-start:not(.gmail-sort-group-first) {
-  box-shadow: 0 -2px 0 0 var(--sort-accent, #1a73e8) !important;
+/* Divider above each new sender (not the first). A shadow avoids reflow. */
+tr.zA[data-inboxsort-group="even"][data-inboxsort-group-start="next"] {
+  box-shadow: inset 4px 0 0 0 var(--sort-accent, #1a73e8), 0 -2px 0 0 var(--sort-accent, #1a73e8) !important;
 }
-
-/* Even group starts retain the same divider. */
-tr.zA.gmail-sort-group-even.gmail-sort-group-start:not(.gmail-sort-group-first) {
-  box-shadow: 0 -2px 0 0 var(--sort-accent, #1a73e8) !important;
-}
-
-/* The first group needs no divider. */
-tr.zA.gmail-sort-group-start.gmail-sort-group-first {
-  box-shadow: none !important;
-}
-tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
-  box-shadow: none !important;
+tr.zA[data-inboxsort-group="odd"][data-inboxsort-group-start="next"] {
+  box-shadow: inset 4px 0 0 0 var(--sort-group-odd-bar), 0 -2px 0 0 var(--sort-accent, #1a73e8) !important;
 }
 
 /* Sender count badge (injected by JS next to sender name) */
@@ -676,38 +670,6 @@ tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
   background: rgba(176, 96, 0, 0.15) !important;
   color: #fdd663 !important;
   border-color: rgba(253, 214, 99, 0.2) !important;
-}
-
-/* ── Dark mode: group-by-sender ───────────────────────── */
-/* Uses html.gmail-sort-dark-mode (set on <html>) so table rows outside
-   the extension container can be properly styled in dark mode. */
-
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even {
-  background-color: var(--sort-accent-light, rgba(138, 180, 248, 0.18)) !important;
-  box-shadow: none !important;
-}
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even > td,
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even td {
-  background-color: var(--sort-accent-light, rgba(138, 180, 248, 0.18)) !important;
-  background: var(--sort-accent-light, rgba(138, 180, 248, 0.18)) !important;
-}
-
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start:not(.gmail-sort-group-even),
-html.gmail-sort-dark-mode tr.zA[data-sort-group]:not(.gmail-sort-group-even) {
-  box-shadow: none !important;
-}
-
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start:not(.gmail-sort-group-first) {
-  box-shadow: 0 -2px 0 0 var(--sort-accent, #8ab4f8) !important;
-}
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start:not(.gmail-sort-group-first) {
-  box-shadow: 0 -2px 0 0 var(--sort-accent, #8ab4f8) !important;
-}
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-start.gmail-sort-group-first {
-  box-shadow: none !important;
-}
-html.gmail-sort-dark-mode tr.zA.gmail-sort-group-even.gmail-sort-group-start.gmail-sort-group-first {
-  box-shadow: none !important;
 }
 
 /* Dark mode badge */

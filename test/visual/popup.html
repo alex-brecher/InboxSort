@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>InboxSort visual check: popup</title>
+  <link rel="stylesheet" href="../../popup.css">
+  <script src="chrome-shim.js"></script>
+  <script>
+    // Seed the popup's pre-paint theme cache from ?appearance= like a returning user.
+    try { localStorage.setItem("inboxsort-appearance", new URLSearchParams(location.search).get("appearance") || "system"); } catch (_) {}
+  </script>
+  <script src="../../theme-boot.js"></script>
+</head>
+<body>
+  <script>
+    // Load the real popup markup, then the real scripts.
+    fetch("../../popup.html").then((r) => r.text()).then((html) => {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      doc.querySelectorAll("script").forEach((s) => s.remove());
+      document.body.innerHTML = doc.body.innerHTML;
+      for (const src of ["../../shared.js", "../../popup.js"]) {
+        const el = document.createElement("script"); el.src = src; el.async = false; document.body.appendChild(el);
+      }
+    });
+  </script>
+</body>
+</html>

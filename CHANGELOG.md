@@ -5,6 +5,28 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.4.0] -- 2026-11-16
+
+### Added
+- Appearance setting in the popup: System (default), Light or Dark. System follows the computer's setting and switches live. The popup and the Gmail toolbar now always match.
+- The email count shows which page InboxSort is sorting (Gmail pages hold at most 100 conversations). When Gmail is set below 100 per page, a Show 100 per page button opens the Gmail setting.
+
+### Fixed
+- Oldest no longer traps Gmail on the last page. Opening page 1 (or any page) with Oldest active now sorts that page instead of jumping back. Only choosing Oldest jumps to the last page.
+- Shift-click selection now selects the range you see. Before, it followed Gmail's hidden order and could tick emails that looked far apart, so a bulk archive or delete could hit the wrong messages.
+- Rows no longer stay overlapped after archiving two emails quickly.
+- Group-by-sender colors no longer disappear after about two minutes, and they follow the theme and accent color.
+- Settings could stop saving for good once "Remember per label" had stored many labels. Label memory is now capped well under Chrome's sync limit.
+- Choosing a sort while sorting was paused saved Group by sender as off. Grouping now stays on.
+- The / and ? shortcuts no longer take over Gmail's own shortcuts inside an open email.
+- Background re-sorts no longer write to Chrome sync storage on every page load and resize.
+
+### Changed
+- Split the content script into smaller files (shared, icons, rows, views, core) with no build step, and shared constants with the popup.
+- Added ESLint (`npm run lint`) and 11 new regression tests (41 total).
+
+---
+
 ## [1.3.2] -- 2026-08-31
 
 ### Fixed

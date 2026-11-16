@@ -164,6 +164,7 @@ input:focus-visible {
 .section-heading p,
 .setting-copy small,
 .accent-row small,
+.appearance-row small,
 .collapse-toggle small {
   display: block;
   margin: 2px 0 0;
@@ -299,6 +300,7 @@ input:focus-visible {
 
 .setting-copy strong,
 .accent-row strong,
+.appearance-row strong,
 .collapse-toggle strong {
   display: block;
   font-size: 12px;
@@ -427,6 +429,50 @@ input:focus-visible {
   justify-content: space-between;
   gap: 12px;
   padding-top: 11px;
+}
+
+.appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 11px;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.segmented-btn {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+
+.segmented-btn:hover {
+  color: var(--ink);
+}
+
+.segmented-btn.active {
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+html[data-theme="dark"] .segmented-btn.active {
+  color: var(--accent-dm);
 }
 
 .color-picker {
@@ -666,69 +712,74 @@ kbd {
   text-underline-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1f2023;
-    --surface: #292a2d;
-    --surface-subtle: #303134;
-    --surface-hover: #35363a;
-    --ink: #f1f3f4;
-    --muted: #bdc1c6;
-    --faint: #aeb2b7;
-    --border: #45474a;
-    --border-strong: #5f6368;
-    --danger: #f2b8b5;
-    --warning-bg: #433718;
-    --warning-ink: #fdd663;
-    --success-bg: #203c28;
-    --success-ink: #a8dab5;
-  }
+/* Theme: theme-boot.js sets html[data-theme] before first paint from the
+   saved Appearance (System follows prefers-color-scheme; Light/Dark force). */
+html[data-theme="light"] {
+  color-scheme: light;
+}
 
-  .app-header {
-    background: rgba(41, 42, 45, 0.96);
-  }
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1f2023;
+  --surface: #292a2d;
+  --surface-subtle: #303134;
+  --surface-hover: #35363a;
+  --ink: #f1f3f4;
+  --muted: #bdc1c6;
+  --faint: #aeb2b7;
+  --border: #45474a;
+  --border-strong: #5f6368;
+  --danger: #f2b8b5;
+  --warning-bg: #433718;
+  --warning-ink: #fdd663;
+  --success-bg: #203c28;
+  --success-ink: #a8dab5;
+}
 
-  .brand-mark {
-    color: var(--accent-dm);
-    background: var(--accent-dm-light);
-  }
+html[data-theme="dark"] .app-header {
+  background: rgba(41, 42, 45, 0.96);
+}
 
-  .sort-option.active,
-  .filter-chip.active {
-    background: var(--accent-dm-light);
-    border-color: var(--accent-dm);
-    color: var(--accent-dm);
-  }
+html[data-theme="dark"] .brand-mark {
+  color: var(--accent-dm);
+  background: var(--accent-dm-light);
+}
 
-  .sort-option.active small {
-    color: var(--accent-dm);
-  }
+html[data-theme="dark"] .sort-option.active,
+html[data-theme="dark"] .filter-chip.active {
+  background: var(--accent-dm-light);
+  border-color: var(--accent-dm);
+  color: var(--accent-dm);
+}
 
-  .sort-option.active .sort-option-icon {
-    background: var(--accent-dm);
-    color: #202124;
-  }
+html[data-theme="dark"] .sort-option.active small {
+  color: var(--accent-dm);
+}
 
-  .setting-row.on .switch-control,
-  .group-toggle-option.active .switch-control,
-  .tab-vis-item.on .mini-switch {
-    background: var(--accent-dm);
-  }
+html[data-theme="dark"] .sort-option.active .sort-option-icon {
+  background: var(--accent-dm);
+  color: #202124;
+}
 
-  .setting-row:hover .setting-copy strong,
-  .footer a {
-    color: var(--accent-dm);
-  }
+html[data-theme="dark"] .setting-row.on .switch-control,
+html[data-theme="dark"] .group-toggle-option.active .switch-control,
+html[data-theme="dark"] .tab-vis-item.on .mini-switch {
+  background: var(--accent-dm);
+}
 
-  .color-swatch.active {
-    border-color: #ffffff;
-  }
+html[data-theme="dark"] .setting-row:hover .setting-copy strong,
+html[data-theme="dark"] .footer a {
+  color: var(--accent-dm);
+}
 
-  .export-import-status.error,
-  .reset-btn:hover,
-  .reset-btn.armed {
-    background: #4e2927;
-  }
+html[data-theme="dark"] .color-swatch.active {
+  border-color: #ffffff;
+}
+
+html[data-theme="dark"] .export-import-status.error,
+html[data-theme="dark"] .reset-btn:hover,
+html[data-theme="dark"] .reset-btn.armed {
+  background: #4e2927;
 }
 
 @media (prefers-reduced-motion: reduce) {
