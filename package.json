@@ -3,9 +3,13 @@
   "version": "1.3.2",
   "private": true,
   "scripts": {
-    "test": "node test/scenario-matrix.js && node test/popup-accessibility.js"
+    "test": "node test/scenario-matrix.js && node test/popup-accessibility.js",
+    "lint": "eslint .",
+    "check": "npm run lint && npm test"
   },
   "devDependencies": {
+    "eslint": "9.39.1",
+    "globals": "16.5.0",
     "jsdom": "26.1.0"
   }
 }

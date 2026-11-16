@@ -395,7 +395,7 @@ document.getElementById("sortOptions").addEventListener("click", function (e) {
 
 document.getElementById("groupToggleBtn").addEventListener("click", function () {
   // Optimistic UI toggle for instant visual feedback
-  var groupBtn = document.getElementById("groupToggleBtn");
+  let groupBtn = document.getElementById("groupToggleBtn");
   if (groupBtn) {
     setToggleState(groupBtn, groupBtn.getAttribute("aria-checked") !== "true", "active");
   }
@@ -749,7 +749,7 @@ updateTabVisibility();
 
 // Set version dynamically from manifest
 try {
-  var versionEl = document.getElementById("inboxsort-version");
+  const versionEl = document.getElementById("inboxsort-version");
   if (versionEl) versionEl.textContent = "InboxSort v" + chrome.runtime.getManifest().version;
 } catch (_) {}
 

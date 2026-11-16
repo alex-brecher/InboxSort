@@ -760,22 +760,9 @@
     _rowCache = null;
     _rowCacheTime = 0;
     _rowMeta = new WeakMap();
-    _rowTds = new WeakMap();
     _lastStatsKey = "";
     _lastSortedRowCount = 0;
     _lastSortedRowElements = null;
-  }
-
-  // ── Cached <td> query per row (avoids querySelectorAll("td") in hot loops) ─
-
-  let _rowTds = new WeakMap();
-
-  function getRowTds(row) {
-    let cached = _rowTds.get(row);
-    if (cached) return cached;
-    let tds = row.querySelectorAll("td");
-    _rowTds.set(row, tds);
-    return tds;
   }
 
   // ── Row metadata cache (avoids repeated expensive DOM queries) ────
@@ -1385,15 +1372,15 @@
     // Retry pass — Gmail may swallow rapid programmatic checkbox clicks,
     // especially on newly-arrived rows.  Re-check after a short delay and
     // click any that didn't register the first time.
-    var _retryRows = visibleRows;
-    var _retryDeselect = shouldDeselect;
+    let _retryRows = visibleRows;
+    let _retryDeselect = shouldDeselect;
     setTimeout(function () {
       _programmaticCheckboxClick = true;
       try {
-        for (var rj = 0; rj < _retryRows.length; rj++) {
-          var rcb = _retryRows[rj].querySelector('div[role="checkbox"]');
+        for (let rj = 0; rj < _retryRows.length; rj++) {
+          let rcb = _retryRows[rj].querySelector('div[role="checkbox"]');
           if (!rcb) continue;
-          var rChecked = rcb.getAttribute("aria-checked") === "true";
+          let rChecked = rcb.getAttribute("aria-checked") === "true";
           if (_retryDeselect && rChecked) rcb.click();
           else if (!_retryDeselect && !rChecked) rcb.click();
         }
@@ -1447,7 +1434,7 @@
       // If group is enabled, still need to apply transforms for grouping
       // Apply transforms BEFORE refreshUI to avoid two-frame jump
       if (groupEnabled) {
-        let gc = applySortTransforms("newest", !silent, true);
+        applySortTransforms("newest", !silent, true);
         refreshUI();
         if (!silent) showNotification("Grouped by sender");
       } else {
@@ -1566,7 +1553,7 @@
     // Gmail composites <tr> layers independently during the transition, which
     // briefly paints old and new row content on top of each other.
     // skipClear=true because we already cleared above.
-    let sortedCount = applySortTransforms(currentSort === "newest" ? "newest" : currentSort, false, true);
+    applySortTransforms(currentSort === "newest" ? "newest" : currentSort, false, true);
     refreshUI();
     if (groupEnabled) {
       showNotification("Grouped by sender");
@@ -2180,7 +2167,7 @@
     // Keyboard shortcuts: Alt+number (when not in any input)
     if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       // Use activeElement (not e.target) so Alt+key works after search-input blur
-      var ae = document.activeElement;
+      let ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)) return;
       if (!getActiveToolbar()) return;
 
@@ -2587,7 +2574,7 @@
         }
         break;
 
-      case "getState":
+      case "getState": {
         let snoozed = isSnoozedActive();
         sendResponse({
           sortMode: currentSort,
@@ -2605,6 +2592,7 @@
           snoozedSort: snoozedSort
         });
         return false; // responded synchronously
+      }
     }
     if (handled) sendResponse({ ok: true });
   });
