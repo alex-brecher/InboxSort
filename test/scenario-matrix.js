@@ -132,14 +132,20 @@ async function createApp(url = "https://mail.google.com/mail/u/0/#inbox", option
   );
   const { window } = dom;
   installLayout(window);
-  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const media = { matches: !!options.systemDark, listeners: [] };
+  window.matchMedia = () => ({
+    get matches() { return media.matches; },
+    addEventListener(_type, fn) { media.listeners.push(fn); },
+    removeEventListener() {}
+  });
   const state = options.state || { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
   const bus = options.bus || { listeners: [] };
   window.chrome = makeChrome(window, state, bus);
   window.eval(source);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   await wait(700);
-  return { dom, window, state, bus };
+  const setSystemDark = (on) => { media.matches = on; media.listeners.forEach((fn) => fn({ matches: on })); };
+  return { dom, window, state, bus, setSystemDark };
 }
 
 function visualOrder(window) {
@@ -447,6 +453,44 @@ async function run() {
   rangeApp.window.dispatchEvent(new rangeApp.window.Event("beforeunload"));
   rangeApp.dom.window.close();
   pass("shift-click range follows visual order and hidden toolbar leaves / and ? to Gmail");
+
+  // Appearance: System follows the OS live; Light and Dark override it.
+  const themeState = { sortMode: "newest", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const themeApp = await createApp(undefined, { state: themeState, systemDark: true });
+  const tdoc = themeApp.window.document;
+  const isDark = () => tdoc.documentElement.classList.contains("gmail-sort-dark-mode") && tdoc.querySelector(".gmail-sort-container").classList.contains("gmail-sort-dark");
+  assert.equal(isDark(), true);
+  assert.equal(tdoc.documentElement.style.getPropertyValue("--sort-accent"), "#8ab4f8");
+  themeApp.setSystemDark(false);
+  assert.equal(tdoc.documentElement.classList.contains("gmail-sort-dark-mode"), false);
+  assert.equal(tdoc.documentElement.style.getPropertyValue("--sort-accent"), "#1a73e8");
+  themeApp.window.chrome.storage.sync.set({ appearance: "dark" });
+  assert.equal(isDark(), true);
+  themeApp.setSystemDark(false);
+  assert.equal(isDark(), true);
+  await themeApp.window.chrome._sendMessage({ action: "setAppearance", appearance: "light" });
+  assert.equal(tdoc.documentElement.classList.contains("gmail-sort-dark-mode"), false);
+  assert.equal((await themeApp.window.chrome._sendMessage({ action: "getState" })).appearance, "light");
+  pass("appearance follows system live and Light/Dark override it");
+
+  // Group marks are data attributes and are re-applied when Gmail swaps a row.
+  themeApp.window.document.body.dispatchEvent(new themeApp.window.KeyboardEvent("keydown", { bubbles: true, altKey: true, code: "Digit6", key: "6" }));
+  await wait(100);
+  const marked = () => [...tdoc.querySelectorAll("tr.zA")].filter((r) => r.hasAttribute("data-inboxsort-group")).length;
+  assert.equal(marked(), 4);
+  assert.equal(tdoc.querySelectorAll('[data-inboxsort-group-start="first"]').length, 1);
+  const swapped = tdoc.querySelector('tr[data-id="star-new"]'); // 4th DOM row: outside the old first-3 check
+  const fresh = swapped.cloneNode(true);
+  for (const attr of ["data-inboxsort-group", "data-inboxsort-group-start", "data-sort-group", "style"]) fresh.removeAttribute(attr);
+  swapped.replaceWith(fresh);
+  await wait(900);
+  assert.ok(fresh.hasAttribute("data-inboxsort-group"));
+  assert.equal(marked(), 4);
+  assertNoOverlap(visualOrder(themeApp.window));
+  assert.match(styles, /tr\.zA\[data-inboxsort-group="even"\]/);
+  themeApp.window.dispatchEvent(new themeApp.window.Event("beforeunload"));
+  themeApp.dom.window.close();
+  pass("group marks survive Gmail swapping a row element");
 
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);

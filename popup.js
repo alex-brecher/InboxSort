@@ -271,14 +271,29 @@ function applyAccentColor(color) {
   document.body.style.setProperty("--accent-dm-light", dc.light);
 }
 
-// ── Apply dark mode (with live listener) ─────────────────────
+// ── Appearance (System / Light / Dark) ───────────────────────
 
-function applyDarkMode() {
-  const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
-  if (!mq) return;
-  document.body.classList.toggle("dark", mq.matches);
-  mq.addEventListener("change", function (e) {
-    document.body.classList.toggle("dark", e.matches);
+const APPEARANCE_MODES = { system: true, light: true, dark: true };
+let appearanceMode = "system";
+const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+function normalizeAppearance(mode) {
+  return APPEARANCE_MODES[mode] ? mode : "system";
+}
+
+function applyAppearance(mode) {
+  appearanceMode = normalizeAppearance(mode);
+  const dark = appearanceMode === "dark" || (appearanceMode === "system" && !!(darkQuery && darkQuery.matches));
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  document.querySelectorAll(".segmented-btn[data-appearance]").forEach(function (btn) {
+    setToggleState(btn, btn.getAttribute("data-appearance") === appearanceMode, "active");
+  });
+  try { localStorage.setItem("inboxsort-appearance", appearanceMode); } catch (_) { /* storage blocked */ }
+}
+
+if (darkQuery) {
+  darkQuery.addEventListener("change", function () {
+    if (appearanceMode === "system") applyAppearance("system");
   });
 }
 
@@ -305,10 +320,12 @@ function updatePopupState() {
     sortMode: "newest",
     groupEnabled: false,
     accentColor: "blue",
+    appearance: "system",
     autoSort: true,
     perLabel: false
   }, function (data) {
     const sortMode = normalizeSortMode(data.sortMode);
+    applyAppearance(data.appearance);
 
     // Apply accent color
     applyAccentColor(data.accentColor);
@@ -459,6 +476,17 @@ document.getElementById("colorPicker").addEventListener("click", function (e) {
       }
     });
   });
+});
+
+// ── Appearance picker ────────────────────────────────────────
+
+document.getElementById("appearancePicker").addEventListener("click", function (e) {
+  const btn = e.target.closest(".segmented-btn[data-appearance]");
+  if (!btn) return;
+  const mode = normalizeAppearance(btn.getAttribute("data-appearance"));
+  applyAppearance(mode);
+  // Gmail tabs pick this up through chrome.storage.onChanged.
+  safeStorageSet({ appearance: mode });
 });
 
 // ── Quick filter chip handlers ───────────────────────────────
@@ -643,6 +671,7 @@ document.getElementById("importFileInput").addEventListener("change", function (
         sortMode:     function (v) { return typeof v === "string" && ["newest","oldest","senderAZ","senderZA","unreadFirst","starredFirst"].indexOf(v) !== -1; },
         groupEnabled: function (v) { return typeof v === "boolean"; },
         accentColor:  function (v) { return typeof v === "string" && ["blue","green","purple","red","orange","teal"].indexOf(v) !== -1; },
+        appearance:   function (v) { return typeof v === "string" && !!APPEARANCE_MODES[v]; },
         autoSort:     function (v) { return typeof v === "boolean"; },
         perLabel:     function (v) { return typeof v === "boolean"; },
         labelPrefs:   isValidLabelPrefs,
@@ -708,6 +737,7 @@ document.getElementById("resetBtn").addEventListener("click", function () {
     sortMode: "newest",
     groupEnabled: false,
     accentColor: "blue",
+    appearance: "system",
     autoSort: true,
     perLabel: false,
     labelPrefs: {},
@@ -758,7 +788,7 @@ setupCollapsible("toggleShortcuts");
 
 // ── Init ─────────────────────────────────────────────────────
 
-applyDarkMode();
+applyAppearance(appearanceMode);
 updatePopupState();
 updateTabVisibility();
 

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="popup.css">
+  <script src="theme-boot.js"></script>
 </head>
 <body>
   <header class="app-header" id="header">
@@ -102,6 +103,14 @@
         <span class="setting-copy"><strong>Remember per label</strong><small>Use a different sort for each Gmail label</small></span>
         <span class="switch-control" aria-hidden="true"></span>
       </button>
+      <div class="appearance-row">
+        <div><strong>Appearance</strong><small>Popup and Gmail toolbar</small></div>
+        <div class="segmented" id="appearancePicker" role="radiogroup" aria-label="Appearance">
+          <button class="segmented-btn" data-appearance="system" type="button" role="radio" aria-checked="false">System</button>
+          <button class="segmented-btn" data-appearance="light" type="button" role="radio" aria-checked="false">Light</button>
+          <button class="segmented-btn" data-appearance="dark" type="button" role="radio" aria-checked="false">Dark</button>
+        </div>
+      </div>
       <div class="accent-row">
         <div><strong>Accent color</strong><small>Used for active controls in Gmail</small></div>
         <div class="color-picker" id="colorPicker" role="radiogroup" aria-label="Accent color">

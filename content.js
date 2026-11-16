@@ -209,6 +209,7 @@
   let _cheatsheetReturnFocus = null;
   let accentColor      = "blue";
   let isDarkMode       = false;
+  let appearanceMode   = "system"; // "system" (follow the OS), "light" or "dark"
   let hiddenTabs       = {};
 
   // Filters
@@ -236,11 +237,9 @@
   // Cache & perf
   let lastStatsUpdate  = 0;
   let _lastStatsKey    = "";
-  let _currentGroupData = null;   // Saved group data for interval re-apply
 
   // Timer & interval references (cleaned up on page unload)
   let autoSortInterval    = null;
-  let _groupStyleInterval = null; // Persistent group style re-apply
   let _observer           = null; // MutationObserver instance
   let _observerRoot       = null; // Current Gmail main node observed for changes
   let _observerWatchdog   = null; // Reconnects after Gmail replaces the main node
@@ -250,7 +249,7 @@
   let _waitForNewPage     = null; // Pagination poll interval
   let _suppressObserver   = false; // Prevent observer self-triggers during our own DOM writes
   let _lastSortedRowCount = 0;     // Row count at last sort — triggers re-sort when rows change
-  let _lastSortedRowElements = null; // First few row elements for identity-change detection
+  let _lastSortedRowElements = null; // Row elements at last sort, for identity-change detection
   let _lastRowChangeSort  = 0;     // Timestamp of last row-change re-sort (throttle)
   let _searchDebounce     = null;  // Search input debounce timer
   let _hiddenTabsRetryTimers = []; // Delayed storage re-sync timers for hidden tabs
@@ -378,7 +377,6 @@
 
     // Stop timers/intervals to avoid stale loops after extension reload/uninstall.
     if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
-    if (_groupStyleInterval) { clearInterval(_groupStyleInterval); _groupStyleInterval = null; }
     if (_observerDebounce)   { clearTimeout(_observerDebounce);    _observerDebounce = null; }
     if (_observerWatchdog)   { clearInterval(_observerWatchdog);   _observerWatchdog = null; }
     if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
@@ -398,8 +396,6 @@
       }
       _hiddenTabsRetryTimers = [];
     }
-    stopGroupStyleInterval();
-
     if (_observer) { _observer.disconnect(); _observer = null; }
     _observerRoot = null;
     document.removeEventListener("click", onDocumentClick, true);
@@ -598,6 +594,7 @@
         sortMode: "newest",
         groupEnabled: false,
         accentColor: "blue",
+        appearance: "system",
         autoSort: true,
         perLabel: false,
         labelPrefs: {},
@@ -609,6 +606,7 @@
           return;
         }
         accentColor = data.accentColor || "blue";
+        appearanceMode = normalizeAppearance(data.appearance);
         autoSortEnabled = data.autoSort !== false;
         perLabelEnabled = !!data.perLabel;
         hiddenTabs = normalizeHiddenTabs(data.hiddenTabs);
@@ -680,6 +678,10 @@
     if (changes.accentColor) {
       accentColor = changes.accentColor.newValue;
       applyAccentColor();
+    }
+    if (changes.appearance) {
+      appearanceMode = normalizeAppearance(changes.appearance.newValue);
+      applyTheme();
     }
     if (changes.autoSort) {
       autoSortEnabled = changes.autoSort.newValue !== false;
@@ -765,69 +767,43 @@
     }
   }
 
-  // ── Dark-mode detection ───────────────────────────────────────────
+  // ── Appearance (System / Light / Dark) ─────────────────────────────
+  // "system" follows the OS setting through prefers-color-scheme and updates
+  // live when it changes. "light" and "dark" force a theme. The theme is a
+  // class on <html> plus a class on each InboxSort element, and the accent
+  // CSS variables switch with it, so group tints follow automatically.
 
-  let _darkModeDetectedAt = 0;
+  const APPEARANCE_MODES = { system: true, light: true, dark: true };
 
-  function detectDarkMode() {
-    // PERF: Cache detection result for 2s to avoid forced style recalc on every call
-    let now = Date.now();
-    if (_darkModeDetectedAt && (now - _darkModeDetectedAt) < 2000) return;
-    _darkModeDetectedAt = now;
-
-    let detected = false;
-
-    // Strategy 1: Check body background color (catches some dark themes / system dark mode)
-    let bg = window.getComputedStyle(document.body).backgroundColor;
-    if (bg) {
-      let match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-      if (match) {
-        detected = ((parseInt(match[1]) + parseInt(match[2]) + parseInt(match[3])) / 3) < 100;
-      }
-    }
-
-    // Strategy 2: Gmail dark themes keep body bg light but flip text to white.
-    // Check sender / subject text color — if average RGB > 180, text is light → dark mode.
-    if (!detected) {
-      let textEl = document.querySelector(".zF, .yP, .bog, .bqe");
-      if (textEl) {
-        let tc = window.getComputedStyle(textEl).color;
-        let m = tc && tc.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (m) {
-          detected = ((parseInt(m[1]) + parseInt(m[2]) + parseInt(m[3])) / 3) > 180;
-        }
-      }
-    }
-
-    // Strategy 3: Fall back to prefers-color-scheme media query
-    if (!detected && !document.querySelector(".zF, .yP, .bog, .bqe")) {
-      detected = !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    }
-
-    isDarkMode = detected;
-    // Propagate dark mode class to <html> so group-by-sender rows (which are
-    // NOT descendants of .gmail-sort-dark container) can be styled properly.
-    document.documentElement.classList.toggle("gmail-sort-dark-mode", isDarkMode);
+  function normalizeAppearance(mode) {
+    return APPEARANCE_MODES[mode] ? mode : "system";
   }
 
-  // Re-detect dark mode on system theme change
-  if (window.matchMedia) {
+  let _darkQuery = null;
+  try {
+    _darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  } catch (_) { _darkQuery = null; }
+
+  function resolveDarkMode() {
+    if (appearanceMode === "dark") return true;
+    if (appearanceMode === "light") return false;
+    return !!(_darkQuery && _darkQuery.matches);
+  }
+
+  function applyTheme() {
+    isDarkMode = resolveDarkMode();
+    document.documentElement.classList.toggle("gmail-sort-dark-mode", isDarkMode);
+    let themed = document.querySelectorAll(".gmail-sort-container, .gmail-sort-stats, .gmail-sort-toast, .gmail-sort-cheatsheet-backdrop");
+    for (let i = 0; i < themed.length; i++) themed[i].classList.toggle("gmail-sort-dark", isDarkMode);
+    let badges = document.querySelectorAll(".gmail-sort-group-badge");
+    for (let j = 0; j < badges.length; j++) badges[j].classList.toggle("gmail-sort-group-badge-dark", isDarkMode);
+    applyAccentColor();
+  }
+
+  if (_darkQuery) {
     try {
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-        detectDarkMode();
-        if (container) container.classList.toggle("gmail-sort-dark", isDarkMode);
-        if (statsBar) statsBar.classList.toggle("gmail-sort-dark", isDarkMode);
-        applyAccentColor();
-        // Re-apply group styles with correct dark/light colors
-        if (groupEnabled && _currentGroupData) {
-          clearGroupInlineStyles();
-          applyGroupVisuals(_currentGroupData.sortedRows, {
-            ac: isDarkMode
-              ? (DARK_ACCENT_COLORS[accentColor] || DARK_ACCENT_COLORS.blue)
-              : (ACCENT_COLORS[accentColor] || ACCENT_COLORS.blue),
-            perRow: _currentGroupData.perRow
-          });
-        }
+      _darkQuery.addEventListener("change", function () {
+        if (!_contextInvalid && appearanceMode === "system") applyTheme();
       });
     } catch (_) { /* older browsers */ }
   }
@@ -1157,15 +1133,7 @@
     // Clear old group markers and inline styles (writes only, after all reads)
     if (!skipClear) {
       for (let c = 0; c < rows.length; c++) {
-        rows[c].classList.remove("gmail-sort-group-start", "gmail-sort-group-even", "gmail-sort-group-first");
-        rows[c].removeAttribute("data-sort-group");
-        rows[c].style.removeProperty("box-shadow");
-        rows[c].style.removeProperty("background-color");
-        let ctds = getRowTds(rows[c]);
-        for (let ct = 0; ct < ctds.length; ct++) {
-          ctds[ct].style.removeProperty("background");
-          ctds[ct].style.removeProperty("background-color");
-        }
+        clearRowGroupMarks(rows[c]);
       }
     }
 
@@ -1191,10 +1159,6 @@
     // Group visuals: compute group metadata when groupEnabled
     let groupData = null;
     if (groupEnabled) {
-      let ac = isDarkMode
-        ? (DARK_ACCENT_COLORS[accentColor] || DARK_ACCENT_COLORS.blue)
-        : (ACCENT_COLORS[accentColor] || ACCENT_COLORS.blue);
-
       // Count emails per sender for badge numbers
       let senderCounts = {};
       for (let sc = 0; sc < sorted.length; sc++) {
@@ -1230,14 +1194,7 @@
         }
         prevSender = senderKey;
       }
-      groupData = { ac: ac, perRow: perRow, totalGroups: groupIndex + 1 };
-
-      // Save for interval-based re-application
-      _currentGroupData = {
-        sortedRows: sorted.map(function (s) { return s.row; }),
-        perRow: perRow,
-        ac: ac
-      };
+      groupData = { perRow: perRow, totalGroups: groupIndex + 1 };
     }
 
     // Apply group styling and transforms SYNCHRONOUSLY.
@@ -1270,7 +1227,7 @@
     }
 
     _lastSortedRowCount = rows.length;
-    _lastSortedRowElements = rows.slice(0, 3); // Store first few for identity-change detection
+    _lastSortedRowElements = rows.slice(); // Full list: Gmail can swap any row element
     return rows.length;
     } finally { _sortInProgress = false; }
   }
@@ -1281,7 +1238,7 @@
     if (count <= 1) return;
     let senderEl = row.querySelector("span.zF") || row.querySelector("span.bA4");
     if (!senderEl || !senderEl.parentNode) return;
-    // Prevent duplicate badges (can happen if reapplyGroupStyles fires while badges exist)
+    // Prevent duplicate badges on repeated re-application
     if (senderEl.parentNode.querySelector(".gmail-sort-group-badge")) return;
     let badge = document.createElement("span");
     badge.className = "gmail-sort-group-badge";
@@ -1296,196 +1253,39 @@
     for (let b = 0; b < badges.length; b++) badges[b].remove();
   }
 
-  // ── Unified group visual applicator ──────────────────────────────
-  // Applies CSS classes, inline styles, and badges to sorted rows.
-  // Used by rAF, microtask, and interval-based re-applications.
+  // ── Group visuals ────────────────────────────────────────────────
+  // Groups are marked with data attributes and styled from styles.css, so the
+  // colors follow the theme and accent through CSS variables. Gmail swaps row
+  // elements from time to time; the observer's identity check re-sorts and
+  // re-marks them, so no repaint timer is needed.
+
+  function clearRowGroupMarks(row) {
+    row.removeAttribute("data-inboxsort-group");
+    row.removeAttribute("data-inboxsort-group-start");
+    row.removeAttribute("data-sort-group");
+  }
 
   function applyGroupVisuals(sortedArr, gData) {
-    // Clear any existing badges first to prevent duplication on rapid re-application
     clearGroupBadges();
-
-    let gac = gData.ac;
     let gpr = gData.perRow;
-    let styledCount = 0;
-    let badgedCount = 0;
-    let skippedCount = 0;
-
     for (let gi = 0; gi < sortedArr.length; gi++) {
       let row = sortedArr[gi].row || sortedArr[gi];
-      if (!row || !row.isConnected) { skippedCount++; continue; }
       let info = gpr[gi];
-      if (!info) continue;
-
-      // CSS classes
+      if (!row || !row.isConnected || !info) continue;
+      row.setAttribute("data-inboxsort-group", info.isEven ? "even" : "odd");
       if (info.isGroupStart) {
-        row.classList.add("gmail-sort-group-start");
-        if (info.senderKey !== undefined) row.setAttribute("data-sort-group", info.senderKey);
-        if (info.isVeryFirst) row.classList.add("gmail-sort-group-first");
-      }
-      if (info.isEven) {
-        row.classList.add("gmail-sort-group-even");
-      }
-
-      // Badges (only inject if not already present)
-      if (info.isGroupStart && info.badgeNum > 1 && !row.querySelector(".gmail-sort-group-badge")) {
-        injectGroupBadge(row, info.badgeNum);
-        badgedCount++;
-      }
-
-      // INLINE STYLES — background tint on every <td> for even groups
-      // Use BOTH background-color (longhand) AND background (shorthand)
-      // because Gmail may set background-color inline on td elements.
-      // Box-shadow: accent left-bar + top divider between groups
-      let shadows = [];
-      let oddInset = isDarkMode ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)";
-      if (info.isEven) {
-        shadows.push("inset 4px 0 0 0 " + gac.primary);
-        // Background tint on every <td> for even groups
-        row.style.setProperty("background-color", gac.light, "important");
-        let tds = getRowTds(row);
-        for (let t = 0; t < tds.length; t++) {
-          tds[t].style.setProperty("background-color", gac.light, "important");
-          tds[t].style.setProperty("background", gac.light, "important");
-        }
-        styledCount++;
-      } else {
-        shadows.push("inset 4px 0 0 0 " + oddInset);
-      }
-      if (info.isGroupStart && !info.isVeryFirst) {
-        shadows.push("0 -2px 0 0 " + gac.primary);
-      }
-      row.style.setProperty("box-shadow", shadows.join(", "), "important");
-    }
-
-  }
-
-  function clearGroupInlineStyles() {
-    let rows = document.querySelectorAll("tr.zA");
-    for (let i = 0; i < rows.length; i++) {
-      rows[i].style.removeProperty("box-shadow");
-      rows[i].style.removeProperty("background-color");
-      let tds = getRowTds(rows[i]);
-      for (let t = 0; t < tds.length; t++) {
-        tds[t].style.removeProperty("background");
-        tds[t].style.removeProperty("background-color");
+        row.setAttribute("data-inboxsort-group-start", info.isVeryFirst ? "first" : "next");
+        row.setAttribute("data-sort-group", info.senderKey || "");
+        if (info.badgeNum > 1) injectGroupBadge(row, info.badgeNum);
       }
     }
-  }
-
-  // Persistent re-apply using saved group data (_currentGroupData).
-  // Catches Gmail DOM re-renders that wipe inline styles.
-  // PERF: includes dirty-check to skip full re-apply when styles are intact.
-  function reapplyGroupStyles() {
-    if (!groupEnabled || !_currentGroupData) return;
-    try {
-      // Always use current isDarkMode state (may have changed since group was built)
-      let gac = isDarkMode
-        ? (DARK_ACCENT_COLORS[accentColor] || DARK_ACCENT_COLORS.blue)
-        : (ACCENT_COLORS[accentColor] || ACCENT_COLORS.blue);
-      let gpr = _currentGroupData.perRow;
-      let rows = _currentGroupData.sortedRows;
-
-      // PERF: Dirty-check — sample up to 3 even-group rows spread across the list.
-      // If ALL sampled rows are intact, Gmail hasn't wiped our styles, so skip.
-      // Spread sampling (beginning, middle, end) catches partial wipes anywhere in the list.
-      let sampledCount = 0;
-      let intactCount = 0;
-      let dcStarts = [0, Math.floor(rows.length / 2), Math.max(0, rows.length - 5)];
-      for (let si = 0; si < dcStarts.length && sampledCount < 3; si++) {
-        for (let dc = dcStarts[si]; dc < rows.length && sampledCount < (si + 1); dc++) {
-          if (gpr[dc] && gpr[dc].isEven && rows[dc] && rows[dc].isConnected) {
-            sampledCount++;
-            let curShadow = rows[dc].style.getPropertyValue("box-shadow");
-            if (curShadow && curShadow.indexOf(gac.primary) !== -1) intactCount++;
-            break;
-          }
-        }
-      }
-      if (sampledCount > 0 && intactCount === sampledCount) return; // all sampled intact
-
-      let oddInset = isDarkMode ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)";
-      for (let i = 0; i < rows.length; i++) {
-        let row = rows[i];
-        if (!row || !row.isConnected) continue;
-        let info = gpr[i];
-        if (!info) continue;
-
-        // Re-add CSS classes (Gmail may strip them)
-        if (info.isGroupStart) {
-          row.classList.add("gmail-sort-group-start");
-          if (info.isVeryFirst) row.classList.add("gmail-sort-group-first");
-        }
-        if (info.isEven) row.classList.add("gmail-sort-group-even");
-
-        // Re-apply box-shadow + background in one pass
-        let shadows = [];
-        if (info.isEven) {
-          shadows.push("inset 4px 0 0 0 " + gac.primary);
-          row.style.setProperty("background-color", gac.light, "important");
-          let tds = getRowTds(row);
-          for (let t = 0; t < tds.length; t++) {
-            tds[t].style.setProperty("background-color", gac.light, "important");
-            tds[t].style.setProperty("background", gac.light, "important");
-          }
-        } else {
-          shadows.push("inset 4px 0 0 0 " + oddInset);
-        }
-        if (info.isGroupStart && !info.isVeryFirst) {
-          shadows.push("0 -2px 0 0 " + gac.primary);
-        }
-        row.style.setProperty("box-shadow", shadows.join(", "), "important");
-      }
-    } catch (e) {
-      console.warn("[InboxSort] reapplyGroupStyles error:", e);
-    }
-  }
-
-  // PERF: Start with aggressive interval (400ms) for the first 10s when Gmail is
-  // most likely to wipe styles, then slow down to 2s for maintenance.
-  // Auto-stop after 2 minutes to prevent indefinite battery drain.
-  let _groupStyleTick = 0;
-
-  function startGroupStyleInterval() {
-    stopGroupStyleInterval();
-    _groupStyleTick = 0;
-    _scheduleGroupStyleTick();
-  }
-
-  // Single-timer approach: avoids nested setInterval leak where the inner
-  // slow-phase interval could orphan if stopGroupStyleInterval races with
-  // the fast→slow transition. Uses setTimeout chaining with adaptive delay.
-  function _scheduleGroupStyleTick() {
-    var delay = _groupStyleTick < CONFIG.GROUP_FAST_TICKS
-      ? CONFIG.GROUP_FAST_INTERVAL
-      : CONFIG.GROUP_SLOW_INTERVAL;
-    _groupStyleInterval = setTimeout(function () {
-      _groupStyleTick++;
-      if (!groupEnabled || _groupStyleTick >= CONFIG.GROUP_MAX_TICKS) {
-        stopGroupStyleInterval();
-        return;
-      }
-      _suppressObserver = true;
-      try { reapplyGroupStyles(); } finally { queueMicrotask(function () { _suppressObserver = false; }); }
-      _scheduleGroupStyleTick();
-    }, delay);
-  }
-
-  function stopGroupStyleInterval() {
-    if (_groupStyleInterval) {
-      clearTimeout(_groupStyleInterval);
-      _groupStyleInterval = null;
-    }
-    _groupStyleTick = 0;
   }
 
   function clearSortTransforms() {
-    stopGroupStyleInterval();
-    _currentGroupData = null;
     let wasSuppressed = _suppressObserver;
     _suppressObserver = true;
     try {
       clearGroupBadges();
-      clearGroupInlineStyles();
       let rows = document.querySelectorAll("tr.zA");
       for (let i = 0; i < rows.length; i++) {
         let s = rows[i].style;
@@ -1495,8 +1295,7 @@
         s.transform = "";
         s.zIndex = "";
         s.willChange = "";
-        rows[i].classList.remove("gmail-sort-group-start", "gmail-sort-group-even", "gmail-sort-group-first");
-        rows[i].removeAttribute("data-sort-group");
+        clearRowGroupMarks(rows[i]);
       }
       invalidateRowCache();
       _lastSortedRowCount = 0;
@@ -1944,7 +1743,6 @@
         let gc = applySortTransforms("newest", !silent, true);
         refreshUI();
         if (!silent) showNotification("Grouped by sender");
-        if (gc > 0) startGroupStyleInterval();
       } else {
         refreshUI();
         if (!silent) showNotification("Default order restored");
@@ -1973,7 +1771,6 @@
         if (!silent) saveState();
         refreshUI();
         if (count > 0 && !silent) showNotification(groupEnabled ? "Grouped, oldest first" : "Sorted oldest first");
-        if (groupEnabled && count > 0) startGroupStyleInterval();
         return;
       }
 
@@ -1995,7 +1792,6 @@
           if (!silent) saveState();
           refreshUI();
           if (cnt > 0 && !silent) showNotification(groupEnabled ? "Grouped, oldest first" : "Sorted oldest first");
-          if (groupEnabled && cnt > 0) startGroupStyleInterval();
         } else {
           if (!silent) showNotification("Timed out. Try again.");
         }
@@ -2015,11 +1811,6 @@
     refreshUI();
     if (sortedCount > 0 && !silent && modeObj) {
       showNotification(groupEnabled ? "Grouped, " + modeObj.label.toLowerCase() : modeObj.label);
-    }
-
-    // Start persistent group style interval when grouping is active
-    if (groupEnabled && sortedCount > 0) {
-      startGroupStyleInterval();
     }
 
     } finally { queueMicrotask(function () { _suppressObserver = false; }); }
@@ -2072,7 +1863,6 @@
     refreshUI();
     if (groupEnabled) {
       showNotification("Grouped by sender");
-      if (sortedCount > 0) startGroupStyleInterval();
     } else {
       showNotification("Grouping off");
     }
@@ -2325,7 +2115,7 @@
     let toolbar = document.querySelector('div[gh="tm"]');
     if (!toolbar) return;
 
-    detectDarkMode();
+    isDarkMode = resolveDarkMode();
 
     container = document.createElement("div");
     container.className = "gmail-sort-container";
@@ -2801,7 +2591,7 @@
     _autoSortPending = true;
 
     loadState(function () {
-      applyAccentColor();
+      applyTheme();
 
       if (isSnoozedActive()) {
         currentSort = "newest";
@@ -2945,7 +2735,7 @@
     let nowCount = nowRows.length;
     let rowsChanged = (nowCount !== _lastSortedRowCount);
     if (!rowsChanged && _lastSortedRowElements && nowCount > 0) {
-      for (let ri = 0; ri < _lastSortedRowElements.length && ri < nowRows.length; ri++) {
+      for (let ri = 0; ri < nowRows.length; ri++) {
         if (_lastSortedRowElements[ri] !== nowRows[ri]) { rowsChanged = true; break; }
       }
     }
@@ -2957,7 +2747,6 @@
       fullInvalidateRowCache();
       applySortTransforms(currentSort, false, true);
       refreshUI();
-      if (groupEnabled) startGroupStyleInterval();
     } finally {
       queueMicrotask(function () { _suppressObserver = false; });
     }
@@ -3108,12 +2897,19 @@
         clearFilters();
         groupEnabled = false;
         accentColor = "blue";
+        appearanceMode = "system";
         hiddenTabs = {};
         autoSortEnabled = true;
         perLabelEnabled = false;
-        applyAccentColor();
+        applyTheme();
         applyHiddenTabs();
         applySort("newest", false);
+        break;
+
+      case "setAppearance":
+        handled = true;
+        appearanceMode = normalizeAppearance(msg.appearance);
+        applyTheme();
         break;
 
       case "setAccentColor":
@@ -3164,6 +2960,8 @@
           filterAttachment: filterAttachment,
           autoSort: autoSortEnabled,
           perLabel: perLabelEnabled,
+          appearance: appearanceMode,
+          isDark: isDarkMode,
           hiddenTabs: hiddenTabs,
           isSnoozed: snoozed,
           snoozeRemaining: snoozed ? Math.max(0, Math.ceil((snoozeEndTime - Date.now()) / 60000)) : 0,
@@ -3177,7 +2975,6 @@
   // ── Cleanup on page unload ──────────────────────────────────────
   window.addEventListener("beforeunload", function () {
     if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
-    if (_groupStyleInterval) { clearInterval(_groupStyleInterval); _groupStyleInterval = null; }
     if (_observerDebounce)   { clearTimeout(_observerDebounce);    _observerDebounce = null; }
     if (_observerWatchdog)   { clearInterval(_observerWatchdog);   _observerWatchdog = null; }
     if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
