@@ -692,6 +692,27 @@ kbd {
   border-color: var(--danger);
 }
 
+.feedback-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px 14px 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.feedback-row a {
+  color: var(--accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.feedback-row a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .footer {
   display: flex;
   align-items: center;
@@ -768,6 +789,7 @@ html[data-theme="dark"] .tab-vis-item.on .mini-switch {
 }
 
 html[data-theme="dark"] .setting-row:hover .setting-copy strong,
+html[data-theme="dark"] .feedback-row a,
 html[data-theme="dark"] .footer a {
   color: var(--accent-dm);
 }

@@ -75,7 +75,7 @@ function makeChrome(window, state, bus) {
     runtime: {
       id: "inboxsort-matrix",
       lastError: null,
-      getManifest: () => ({ version: "1.4.0" }),
+      getManifest: () => ({ version: "1.4.1" }),
       onMessage: { addListener(listener) { runtimeListeners.push(listener); } }
     },
     storage: {

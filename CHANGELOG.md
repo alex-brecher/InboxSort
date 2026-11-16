@@ -5,6 +5,13 @@ This project follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/
 
 ---
 
+## [1.4.1] -- 2026-11-16
+
+### Added
+- Suggest an idea and Report a problem links at the bottom of the popup. They open a pre-filled GitHub issue with the InboxSort and Chrome versions. Nothing is sent until the user submits on GitHub, so InboxSort still makes no network requests.
+
+---
+
 ## [1.4.0] -- 2026-11-16
 
 ### Added

@@ -134,13 +134,19 @@ InboxSort does **not** request `identity`, `cookies`, `history`, `bookmarks`, `d
 
 ## Version
 
-**v1.4.0** - See [CHANGELOG.md](CHANGELOG.md) for release history.
+**v1.4.1** - See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ---
 
 ## License
 
 This project is provided for personal use. All rights reserved.
+
+---
+
+## Feedback
+
+Use **Suggest an idea** or **Report a problem** at the bottom of the popup. Each opens a pre-filled GitHub issue. Please do not paste email content or addresses.
 
 ---
 
