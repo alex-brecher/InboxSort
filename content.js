@@ -1113,7 +1113,15 @@
     // Delta check — skip DOM rebuild if counts, filter state, AND selection unchanged
     let hasSnooze = isSnoozedActive();
     let snoozeMin = hasSnooze ? Math.max(1, Math.ceil((snoozeEndTime - Date.now()) / 60000)) : 0;
-    let key = [total, unreadCount, starredCount, attachCount,
+    // Gmail pages hold at most 100 conversations and only the page in view
+    // is in the DOM, so InboxSort sorts that page. Say so, and offer the
+    // 100-per-page setting when Gmail is set lower.
+    let pag = parsePagination();
+    let perPage = pag ? pag.end - pag.start + 1 : 0;
+    let offerPageSize = !!(pag && pag.end < pag.total && perPage > 0 && perPage < 100);
+    let pageText = pag ? pag.start + "\u2013" + pag.end + " of " + pag.total : "";
+
+    let key = [pageText, offerPageSize ? 1 : 0, total, unreadCount, starredCount, attachCount,
                filterUnread ? 1 : 0, filterStarred ? 1 : 0, filterAttachment ? 1 : 0,
                snoozeMin, visCount, selCount].join(",");
     if (_lastStatsKey === key) return;
@@ -1129,7 +1137,8 @@
     }
 
     parts.push(
-      '<span class="gmail-sort-stat" data-stat="total">' +
+      '<span class="gmail-sort-stat" data-stat="total"' +
+      (pageText ? ' title="Sorting and counts cover this page: ' + pageText + '"' : '') + '>' +
       '<span class="gmail-sort-stat-num">' + total + '</span> email' + (total !== 1 ? 's' : '') + '</span>'
     );
     parts.push(
@@ -1156,6 +1165,13 @@
 
     // Build stats HTML — join stat items with dot separators
     let html = parts.join('<span class="gmail-sort-stat-sep">\u00b7</span>');
+
+    if (offerPageSize) {
+      html +=
+        '<button type="button" class="gmail-sort-bulk-select" data-action="page-size" ' +
+        'title="Open Gmail settings to show 100 conversations per page, so each sort covers more mail">' +
+        'Show 100 per page</button>';
+    }
 
     // Bulk-select button when any filter is active (appended without dot separator)
     if (anyFilter) {
@@ -1969,7 +1985,7 @@
       // Stats bar click (filter toggle + bulk select)
       if (statsBar && statsBar.isConnected) {
         // Bulk select button
-        let bulkBtn = safeClosest(e.target, ".gmail-sort-bulk-select");
+        let bulkBtn = safeClosest(e.target, '.gmail-sort-bulk-select[data-action="bulk-select"]');
         if (bulkBtn && statsBar.contains(bulkBtn)) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -1977,6 +1993,15 @@
           // Invalidate delta cache so button text rebuilds (select ↔ deselect)
           _lastStatsKey = "";
           setTimeout(updateStats, 50);
+          return;
+        }
+
+        let pageSizeBtn = safeClosest(e.target, '[data-action="page-size"]');
+        if (pageSizeBtn && statsBar.contains(pageSizeBtn)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          location.hash = "#settings/general";
+          showNotification("Set \u201cMaximum page size\u201d to 100, then Save Changes");
           return;
         }
 

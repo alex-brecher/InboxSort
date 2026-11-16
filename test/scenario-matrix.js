@@ -513,6 +513,21 @@ async function run() {
   prefsApp.dom.window.close();
   pass("per-label sort memory is pruned under the sync item limit");
 
+  // Page-size helper: offered only when Gmail shows fewer than 100 per page.
+  const smallPage = await createApp(undefined, { toolbarHtml: '<span class="Dj">1–50 of 197</span>' });
+  const pageBtn = smallPage.window.document.querySelector('[data-action="page-size"]');
+  assert.ok(pageBtn, "page-size button shown at 50 per page");
+  assert.match(smallPage.window.document.querySelector('[data-stat="total"]').title, /1–50 of 197/);
+  pageBtn.click();
+  assert.equal(smallPage.window.location.hash, "#settings/general");
+  smallPage.window.dispatchEvent(new smallPage.window.Event("beforeunload"));
+  smallPage.dom.window.close();
+  const fullPage = await createApp(undefined, { toolbarHtml: '<span class="Dj">1–100 of 197</span>' });
+  assert.equal(fullPage.window.document.querySelector('[data-action="page-size"]'), null);
+  fullPage.window.dispatchEvent(new fullPage.window.Event("beforeunload"));
+  fullPage.dom.window.close();
+  pass("page-size helper appears only below 100 per page");
+
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);
   popout.window.dispatchEvent(new popout.window.Event("beforeunload"));
