@@ -403,6 +403,10 @@
     if (_observer) { _observer.disconnect(); _observer = null; }
     _observerRoot = null;
     document.removeEventListener("click", onDocumentClick, true);
+    document.removeEventListener("mousedown", onCheckboxPointer, true);
+    document.removeEventListener("mouseup", onCheckboxPointer, true);
+    document.removeEventListener("click", onCheckboxPointer, true);
+    document.removeEventListener("click", rememberSelectAnchor, true);
     document.removeEventListener("mousedown", onDocumentMousedown, true);
     document.removeEventListener("input", onDocumentInput, false);
     document.removeEventListener("keydown", onDocumentKeydown, true);
@@ -1865,8 +1869,11 @@
       let checkbox = visibleRows[j].querySelector('div[role="checkbox"]');
       if (!checkbox) continue;
       let isChecked = checkbox.getAttribute("aria-checked") === "true";
-      if (shouldDeselect && isChecked) { checkbox.click(); changed++; }
-      else if (!shouldDeselect && !isChecked) { checkbox.click(); changed++; }
+      _programmaticCheckboxClick = true;
+      try {
+        if (shouldDeselect && isChecked) { checkbox.click(); changed++; }
+        else if (!shouldDeselect && !isChecked) { checkbox.click(); changed++; }
+      } finally { _programmaticCheckboxClick = false; }
     }
 
     // Retry pass — Gmail may swallow rapid programmatic checkbox clicks,
@@ -1875,13 +1882,16 @@
     var _retryRows = visibleRows;
     var _retryDeselect = shouldDeselect;
     setTimeout(function () {
-      for (var rj = 0; rj < _retryRows.length; rj++) {
-        var rcb = _retryRows[rj].querySelector('div[role="checkbox"]');
-        if (!rcb) continue;
-        var rChecked = rcb.getAttribute("aria-checked") === "true";
-        if (_retryDeselect && rChecked) rcb.click();
-        else if (!_retryDeselect && !rChecked) rcb.click();
-      }
+      _programmaticCheckboxClick = true;
+      try {
+        for (var rj = 0; rj < _retryRows.length; rj++) {
+          var rcb = _retryRows[rj].querySelector('div[role="checkbox"]');
+          if (!rcb) continue;
+          var rChecked = rcb.getAttribute("aria-checked") === "true";
+          if (_retryDeselect && rChecked) rcb.click();
+          else if (!_retryDeselect && !rChecked) rcb.click();
+        }
+      } finally { _programmaticCheckboxClick = false; }
       // Force stats refresh after retry so button text reflects final state
       _lastStatsKey = "";
       updateStats();
@@ -2439,6 +2449,95 @@
     return null;
   }
 
+  // ── Shift-click range selection in visual order ───────────────────
+  // Sorting only moves rows visually. Gmail's own shift-click selects the
+  // range in DOM order, which can tick rows that look far apart, and a bulk
+  // archive or delete would then hit the wrong emails. While a sort or group
+  // is active, InboxSort selects the range the user actually sees instead.
+
+  let _selectAnchorRow = null;
+  let _programmaticCheckboxClick = false; // our own range / bulk clicks keep the anchor
+
+  function isSortVisuallyActive() {
+    return !isSnoozedActive() && (currentSort !== "newest" || groupEnabled) && _lastSortedRowCount > 0;
+  }
+
+  function getRowCheckbox(row) {
+    return row ? row.querySelector('div[role="checkbox"]') : null;
+  }
+
+  function isRowChecked(row) {
+    let cb = getRowCheckbox(row);
+    return !!(cb && cb.getAttribute("aria-checked") === "true");
+  }
+
+  function getRowsInVisualOrder() {
+    let rows = getVisibleEmailRows(true);
+    let items = new Array(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      items[i] = { row: rows[i], top: rows[i].getBoundingClientRect().top };
+    }
+    items.sort(function (a, b) { return a.top - b.top; });
+    return items.map(function (it) { return it.row; });
+  }
+
+  function checkboxRowFromEvent(e) {
+    let cb = safeClosest(e.target, 'div[role="checkbox"]');
+    if (!cb) return null;
+    let row = safeClosest(cb, "tr.zA");
+    return row ? { checkbox: cb, row: row } : null;
+  }
+
+  function selectVisualRange(anchorRow, targetRow) {
+    let ordered = getRowsInVisualOrder();
+    let a = ordered.indexOf(anchorRow);
+    let b = ordered.indexOf(targetRow);
+    if (a === -1 || b === -1) return false;
+    let shouldCheck = !isRowChecked(targetRow);
+    let lo = Math.min(a, b), hi = Math.max(a, b);
+    _programmaticCheckboxClick = true;
+    try {
+      for (let i = lo; i <= hi; i++) {
+        let cb = getRowCheckbox(ordered[i]);
+        if (cb && isRowChecked(ordered[i]) !== shouldCheck) cb.click();
+      }
+    } finally {
+      _programmaticCheckboxClick = false;
+    }
+    return true;
+  }
+
+  // Capture-phase guard so Gmail never sees the shift gesture itself.
+  function onCheckboxPointer(e) {
+    if (_contextInvalid || !e.shiftKey || !isSortVisuallyActive()) return;
+    let hit = checkboxRowFromEvent(e);
+    if (!hit || !_selectAnchorRow || !_selectAnchorRow.isConnected || _selectAnchorRow === hit.row) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.type === "click") {
+      if (selectVisualRange(_selectAnchorRow, hit.row)) _selectAnchorRow = hit.row;
+      _lastStatsKey = "";
+      setTimeout(updateStats, 50);
+    }
+  }
+
+  function rememberSelectAnchor(e) {
+    if (_contextInvalid || e.shiftKey || _programmaticCheckboxClick) return;
+    let hit = checkboxRowFromEvent(e);
+    if (hit) _selectAnchorRow = hit.row;
+  }
+
+  // Returns the live toolbar when it is showing (list views only). Gmail can
+  // re-render the toolbar area, so re-acquire a stale reference first.
+  function getActiveToolbar() {
+    if (!container || !container.isConnected) {
+      let live = document.querySelector(".gmail-sort-container");
+      if (!live || !live.isConnected) return null;
+      container = live;
+    }
+    return container.classList.contains("gmail-sort-hidden") ? null : container;
+  }
+
   // ── Event handlers (capturing phase for clicks) ───────────────────
 
   function onDocumentClick(e) {
@@ -2478,14 +2577,7 @@
       // try to re-acquire the live container before bailing.  This prevents a
       // ~17-second delay where clicks are silently dropped until the MutationObserver
       // re-injects the toolbar and triggers autoSortWhenReady.
-      if (!container || !container.isConnected) {
-        let liveContainer = document.querySelector(".gmail-sort-container");
-        if (liveContainer && liveContainer.isConnected) {
-          container = liveContainer;
-        } else {
-          return;
-        }
-      }
+      if (!getActiveToolbar()) return;
 
       // Group toggle click
       let groupToggle = safeClosest(e.target, ".gmail-sort-group-toggle");
@@ -2542,6 +2634,10 @@
     }
   }
   document.addEventListener("click", onDocumentClick, true);
+  document.addEventListener("mousedown", onCheckboxPointer, true);
+  document.addEventListener("mouseup", onCheckboxPointer, true);
+  document.addEventListener("click", onCheckboxPointer, true);
+  document.addEventListener("click", rememberSelectAnchor, true);
 
   function onDocumentMousedown(e) {
     if (_contextInvalid) return;
@@ -2557,11 +2653,7 @@
           return;
         }
       }
-      if (!container || !container.isConnected) {
-        let liveContainer = document.querySelector(".gmail-sort-container");
-        if (liveContainer && liveContainer.isConnected) { container = liveContainer; }
-        else { return; }
-      }
+      if (!getActiveToolbar()) return;
       let hit = safeClosest(e.target, ".gmail-sort-tab") ||
                 safeClosest(e.target, ".gmail-sort-search-close") ||
                 safeClosest(e.target, ".gmail-sort-search-input") ||
@@ -2621,6 +2713,8 @@
     // Also match key="/" + shiftKey for browser automation and non-US layouts
     if ((e.key === "?" || (e.key === "/" && e.shiftKey)) && !e.altKey && !e.ctrlKey && !e.metaKey) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
+      // Leave Gmail's own "?" help alone where the toolbar is hidden (threads).
+      if (!getActiveToolbar() && !(cheatsheetEl && cheatsheetEl.isConnected)) return;
       e.preventDefault();
       e.stopPropagation();
       toggleCheatSheet();
@@ -2638,11 +2732,8 @@
     // "/" to focus search (when not in any input; skip when Shift held — that's "?")
     if (e.key === "/" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
-      if (!container || !container.isConnected) {
-        let liveContainer = document.querySelector(".gmail-sort-container");
-        if (liveContainer && liveContainer.isConnected) { container = liveContainer; }
-        else { return; }
-      }
+      // Hidden toolbar (thread view): let Gmail's own "/" search shortcut work.
+      if (!getActiveToolbar()) return;
       let searchEl = container.querySelector(".gmail-sort-search-input");
       if (searchEl) {
         e.preventDefault();
@@ -2657,11 +2748,7 @@
       // Use activeElement (not e.target) so Alt+key works after search-input blur
       var ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)) return;
-      if (!container || !container.isConnected) {
-        let liveContainer = document.querySelector(".gmail-sort-container");
-        if (liveContainer && liveContainer.isConnected) { container = liveContainer; }
-        else { return; }
-      }
+      if (!getActiveToolbar()) return;
 
       let handled = true;
       switch (e.code) {
@@ -3113,6 +3200,10 @@
       _hiddenTabsRetryTimers = [];
     }
     document.removeEventListener("click", onDocumentClick, true);
+    document.removeEventListener("mousedown", onCheckboxPointer, true);
+    document.removeEventListener("mouseup", onCheckboxPointer, true);
+    document.removeEventListener("click", onCheckboxPointer, true);
+    document.removeEventListener("click", rememberSelectAnchor, true);
     document.removeEventListener("mousedown", onDocumentMousedown, true);
     document.removeEventListener("input", onDocumentInput, false);
     document.removeEventListener("keydown", onDocumentKeydown, true);

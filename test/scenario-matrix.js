@@ -418,6 +418,36 @@ async function run() {
   paged.dom.window.close();
   pass("saved Oldest sorts the current page and only jumps when chosen");
 
+  // Regression: shift-click selects the range the user sees, not DOM order.
+  const rangeApp = await createApp();
+  const rdoc = rangeApp.window.document;
+  for (const cb of rdoc.querySelectorAll('div[role="checkbox"]')) {
+    cb.addEventListener("click", () => cb.setAttribute("aria-checked", cb.getAttribute("aria-checked") === "true" ? "false" : "true"));
+  }
+  rdoc.querySelector('[data-tab-group="starred"]').click();
+  await wait(300);
+  // Visual order: star-new, star-old, unstar-new, unstar-old. DOM order differs.
+  const cbFor = (id) => rdoc.querySelector(`tr[data-id="${id}"] div[role="checkbox"]`);
+  cbFor("star-new").dispatchEvent(new rangeApp.window.MouseEvent("click", { bubbles: true }));
+  cbFor("star-old").dispatchEvent(new rangeApp.window.MouseEvent("click", { bubbles: true, shiftKey: true }));
+  await wait(20);
+  const checked = [...rdoc.querySelectorAll('tr.zA')].filter((r) => r.querySelector('div[role="checkbox"]').getAttribute("aria-checked") === "true").map((r) => r.dataset.id).sort();
+  assert.deepEqual(checked, ["star-new", "star-old"]);
+  // "/" and "?" must not be captured where the toolbar is hidden.
+  rangeApp.window.location.hash = "#inbox/FMfcgzQhWBmpNjTMDxspXZdSMcSkPplX";
+  rdoc.querySelector('div[role="main"]').appendChild(rdoc.createElement("span"));
+  await wait(400);
+  const slash = new rangeApp.window.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "/" });
+  rdoc.body.dispatchEvent(slash);
+  assert.equal(slash.defaultPrevented, false);
+  const help = new rangeApp.window.KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "?" });
+  rdoc.body.dispatchEvent(help);
+  assert.equal(help.defaultPrevented, false);
+  assert.equal(rdoc.querySelector(".gmail-sort-cheatsheet"), null);
+  rangeApp.window.dispatchEvent(new rangeApp.window.Event("beforeunload"));
+  rangeApp.dom.window.close();
+  pass("shift-click range follows visual order and hidden toolbar leaves / and ? to Gmail");
+
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);
   popout.window.dispatchEvent(new popout.window.Event("beforeunload"));
