@@ -646,6 +646,25 @@ async function run() {
   filterApp.dom.window.close();
   pass("toggling Group while paused keeps the saved sort");
 
+  // Regression: Gmail swaps the whole main area on a label switch and then
+  // goes quiet. The saved sort must still be applied to the new list.
+  const swapState = { sortMode: "starredFirst", groupEnabled: false, autoSort: true, perLabel: false, accentColor: "blue", hiddenTabs: {} };
+  const swapApp = await createApp(undefined, { state: swapState });
+  const wdoc = swapApp.window.document;
+  await wait(300);
+  const newMain = wdoc.createElement("div");
+  newMain.setAttribute("role", "main");
+  newMain.innerHTML = "<table><tbody>" +
+    row("n-unstar", "Kilo", "Aug 28, 2026, 11:00 AM") + row("n-star", "Lima", "Aug 20, 2026, 9:00 AM", { starred: true }) +
+    "</tbody></table>";
+  swapApp.window.location.hash = "#label/Work";
+  wdoc.querySelector('div[role="main"]').replaceWith(newMain);
+  await wait(2600);
+  assert.deepEqual(visualOrder(swapApp.window).map((x) => x.id), ["n-star", "n-unstar"]);
+  swapApp.window.dispatchEvent(new swapApp.window.Event("beforeunload"));
+  swapApp.dom.window.close();
+  pass("saved sort applies after Gmail swaps the main area on a label switch");
+
   const popout = await createApp("https://mail.google.com/mail/u/0/popout?view=pt&th=abc");
   assert.equal(popout.window.document.querySelector(".gmail-sort-container").classList.contains("gmail-sort-hidden"), true);
   popout.window.dispatchEvent(new popout.window.Event("beforeunload"));

@@ -161,6 +161,7 @@
   let _observerRoot       = null; // Current Gmail main node observed for changes
   let _observerWatchdog   = null; // Reconnects after Gmail replaces the main node
   let _observerDebounce   = null; // Observer debounce timer
+  let _observerCallback   = null; // Debounced observer pass, also run after a reattach
   let _initWaitInterval   = null; // init() polling interval
   let _initSafetyTimeout  = null; // init() 30s failsafe timeout
   let _waitForNewPage     = null; // Pagination poll interval
@@ -2411,6 +2412,10 @@
         attachObserverToCurrentRoot();
         fullInvalidateRowCache();
         hasAutoSorted = false;
+        // Gmail may have finished drawing the new view before we reattached,
+        // so no further mutation would arrive and a label switch would never
+        // be noticed. Run the observer's pass once now.
+        if (_observerCallback) _observerCallback();
       }
 
       // Gmail occasionally rebuilds only the top action area. That can remove
@@ -2470,7 +2475,7 @@
   function observe() {
     let lastUrl = stripGmailOverlayParams(location.href);
 
-    _observer = new MutationObserver(function () {
+    _observerCallback = function () {
       // Skip self-triggered mutations from our own DOM writes
       if (_suppressObserver) return;
       if (_observerDebounce) clearTimeout(_observerDebounce);
@@ -2568,7 +2573,8 @@
         // during bulk operations (e.g. archiving 5 emails at once).
         if (!handled) resortIfRowsChanged();
       }, CONFIG.OBSERVER_DEBOUNCE);
-    });
+    };
+    _observer = new MutationObserver(_observerCallback);
 
     // Prefer observing div[role="main"] to avoid firing on compose, sidebars,
     // chat, etc. The watchdog reattaches when Gmail replaces that root.
