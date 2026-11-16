@@ -267,6 +267,16 @@ async function run() {
   assert.equal(doc.querySelectorAll('tr[data-id="star-old"]').length, 0);
   pass("row removal during active sort");
 
+  // Regression: a second archive inside the re-sort throttle window must
+  // still be re-sorted, otherwise rows stay overlapped.
+  doc.querySelector('tr[data-id="unstar-new"]').remove();
+  await wait(300);
+  doc.querySelector('tr[data-id="star-latest"]').remove();
+  await wait(1200);
+  assertNoOverlap(visualOrder(window));
+  assert.equal(visualOrder(window)[0].top, 0);
+  pass("back-to-back archives inside the throttle window re-sort");
+
   for (let i = 0; i < 8; i++) {
     doc.querySelector('[data-tab-group="sender"]').click();
   }

@@ -179,6 +179,8 @@
 
     // Search input debounce — waits for typing to pause before filtering
     SEARCH_DEBOUNCE: 150,
+    // Minimum gap between row-change re-sorts (bulk archive bursts)
+    ROW_CHANGE_THROTTLE: 500,
 
     // Initialisation — waits for Gmail's main content area to appear
     INIT_POLL: 500,                     // interval to check for div[role="main"]
@@ -386,6 +388,7 @@
     if (_initSafetyTimeout)  { clearTimeout(_initSafetyTimeout);   _initSafetyTimeout = null; }
     if (_waitForNewPage)     { clearInterval(_waitForNewPage);     _waitForNewPage = null; }
     if (_saveStateTimer)     { clearTimeout(_saveStateTimer);      _saveStateTimer = null; }
+    if (_rowChangeTimer)     { clearTimeout(_rowChangeTimer);      _rowChangeTimer = null; }
     _saveStatePending = false;
     _saveStateInFlight = false;
     _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
@@ -2831,6 +2834,48 @@
               .replace(/[?&]$/, "");
   }
 
+  // Row-change detection: re-sort when rows change (archive, delete, new mail)
+  // or when Gmail swaps row elements without changing the count. Stale
+  // translateY values would otherwise make rows overlap. Re-sorts are capped
+  // at one per ROW_CHANGE_THROTTLE; a change inside that window is queued for
+  // the end of it instead of being dropped.
+  let _rowChangeTimer = null;
+
+  function resortIfRowsChanged() {
+    if (_contextInvalid || isSnoozedActive() || _lastSortedRowCount === 0) return;
+    if (currentSort === "newest" && !groupEnabled) return;
+    let elapsed = Date.now() - _lastRowChangeSort;
+    if (elapsed < CONFIG.ROW_CHANGE_THROTTLE) {
+      if (!_rowChangeTimer) {
+        _rowChangeTimer = setTimeout(function () {
+          _rowChangeTimer = null;
+          resortIfRowsChanged();
+        }, CONFIG.ROW_CHANGE_THROTTLE - elapsed);
+      }
+      return;
+    }
+    let nowRows = getVisibleEmailRows(true);
+    let nowCount = nowRows.length;
+    let rowsChanged = (nowCount !== _lastSortedRowCount);
+    if (!rowsChanged && _lastSortedRowElements && nowCount > 0) {
+      for (let ri = 0; ri < _lastSortedRowElements.length && ri < nowRows.length; ri++) {
+        if (_lastSortedRowElements[ri] !== nowRows[ri]) { rowsChanged = true; break; }
+      }
+    }
+    if (nowCount === 0 || !rowsChanged) return;
+    _lastRowChangeSort = Date.now();
+    _suppressObserver = true;
+    try {
+      clearSortTransforms();
+      fullInvalidateRowCache();
+      applySortTransforms(currentSort, false, true);
+      refreshUI();
+      if (groupEnabled) startGroupStyleInterval();
+    } finally {
+      queueMicrotask(function () { _suppressObserver = false; });
+    }
+  }
+
   function observe() {
     let lastUrl = stripGmailOverlayParams(location.href);
 
@@ -2930,34 +2975,7 @@
         // to overlap ("bunch") or shift ("jump") after Gmail removes/adds a row.
         // Throttled to at most once per 500ms to avoid rapid sequential re-sorts
         // during bulk operations (e.g. archiving 5 emails at once).
-        if (!handled && !isSnoozedActive() && _lastSortedRowCount > 0 && (currentSort !== "newest" || groupEnabled)) {
-          let rcNow = Date.now();
-          if (rcNow - _lastRowChangeSort >= 500) {
-            let nowRows = getVisibleEmailRows(true);
-            let nowCount = nowRows.length;
-            // Check both count AND element identity — Gmail may replace row elements
-            // without changing the count, which silently wipes our translateY transforms.
-            let rowsChanged = (nowCount !== _lastSortedRowCount);
-            if (!rowsChanged && _lastSortedRowElements && nowCount > 0) {
-              for (let ri = 0; ri < _lastSortedRowElements.length && ri < nowRows.length; ri++) {
-                if (_lastSortedRowElements[ri] !== nowRows[ri]) { rowsChanged = true; break; }
-              }
-            }
-            if (nowCount > 0 && rowsChanged) {
-              _lastRowChangeSort = rcNow;
-              _suppressObserver = true;
-              try {
-                clearSortTransforms();
-                fullInvalidateRowCache();
-                let resortedCount = applySortTransforms(currentSort, false, true);
-                refreshUI();
-                if (groupEnabled) startGroupStyleInterval();
-              } finally {
-                queueMicrotask(function () { _suppressObserver = false; });
-              }
-            }
-          }
-        }
+        if (!handled) resortIfRowsChanged();
       }, CONFIG.OBSERVER_DEBOUNCE);
     });
 
@@ -3077,6 +3095,7 @@
     if (_observerWatchdog)   { clearInterval(_observerWatchdog);   _observerWatchdog = null; }
     if (_searchDebounce)     { clearTimeout(_searchDebounce);      _searchDebounce = null; }
     if (_saveStateTimer)     { clearTimeout(_saveStateTimer);      _saveStateTimer = null; }
+    if (_rowChangeTimer)     { clearTimeout(_rowChangeTimer);      _rowChangeTimer = null; }
     _saveStatePending = false;
     _saveStateInFlight = false;
     _saveStateRetryDelay = CONFIG.SAVE_STATE_RETRY_BASE;
