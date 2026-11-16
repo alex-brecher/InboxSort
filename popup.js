@@ -1,50 +1,10 @@
-// ── Accent color definitions ──────────────────────────────────
+// Shared constants and normalizers come from shared.js (loaded first).
+const { ACCENT_COLORS, DARK_ACCENT_COLORS, SORT_MODE_IDS, APPEARANCE_MODES, normalizeHiddenTabs, normalizeAppearance } = globalThis.InboxSort;
 
-const ACCENT_COLORS = {
-  blue:   { primary: "#1a73e8", hover: "#1765cc", ink: "#174ea6", light: "#d2e3fc" },
-  green:  { primary: "#1e8e3e", hover: "#188038", ink: "#137333", light: "#ceead6" },
-  purple: { primary: "#8430ce", hover: "#7627bb", ink: "#5c16a5", light: "#e8d0fe" },
-  red:    { primary: "#c5221f", hover: "#b31412", ink: "#a50e0e", light: "#f4c7c3" },
-  orange: { primary: "#b85d00", hover: "#a65300", ink: "#8d4900", light: "#fde293" },
-  teal:   { primary: "#007b83", hover: "#006d75", ink: "#005f66", light: "#b2ebf2" }
-};
-
-const DARK_ACCENT_COLORS = {
-  blue:   { primary: "#8ab4f8", hover: "#aecbfa", light: "rgba(138,180,248,0.18)" },
-  green:  { primary: "#81c995", hover: "#a8dab5", light: "rgba(129,201,149,0.18)" },
-  purple: { primary: "#c58af9", hover: "#d7aefb", light: "rgba(197,138,249,0.18)" },
-  red:    { primary: "#f28b82", hover: "#f6aea9", light: "rgba(242,139,130,0.18)" },
-  orange: { primary: "#fdd663", hover: "#fde293", light: "rgba(253,214,99,0.18)" },
-  teal:   { primary: "#4ecdc4", hover: "#73d8d0", light: "rgba(78,205,196,0.18)" }
-};
-
-const VALID_SORT_MODES = {
-  newest: true,
-  oldest: true,
-  senderAZ: true,
-  senderZA: true,
-  unreadFirst: true,
-  starredFirst: true
-};
+const VALID_SORT_MODES = Object.fromEntries(SORT_MODE_IDS.map(function (id) { return [id, true]; }));
 
 function normalizeSortMode(mode) {
   return VALID_SORT_MODES[mode] ? mode : "newest";
-}
-
-function normalizeHiddenTabs(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  const normalized = {};
-  const allowed = ["date", "sender", "unread", "starred", "groupSender"];
-  allowed.forEach(function (key) {
-    if (value[key] === true) normalized[key] = true;
-  });
-
-  // Migrate the old per-mode visibility settings to the merged Gmail toolbar.
-  if (value.oldest === true && value.newest === true) normalized.date = true;
-  if (value.senderAZ === true && value.senderZA === true) normalized.sender = true;
-  if (value.unreadFirst === true) normalized.unread = true;
-  if (value.starredFirst === true) normalized.starred = true;
-  return normalized;
 }
 
 function isPlainObject(value) {
@@ -273,13 +233,8 @@ function applyAccentColor(color) {
 
 // ── Appearance (System / Light / Dark) ───────────────────────
 
-const APPEARANCE_MODES = { system: true, light: true, dark: true };
 let appearanceMode = "system";
 const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-
-function normalizeAppearance(mode) {
-  return APPEARANCE_MODES[mode] ? mode : "system";
-}
 
 function applyAppearance(mode) {
   appearanceMode = normalizeAppearance(mode);
@@ -668,9 +623,9 @@ document.getElementById("importFileInput").addEventListener("change", function (
       }
       // Only import known keys with type validation to prevent junk
       const VALID_SCHEMA = {
-        sortMode:     function (v) { return typeof v === "string" && ["newest","oldest","senderAZ","senderZA","unreadFirst","starredFirst"].indexOf(v) !== -1; },
+        sortMode:     function (v) { return typeof v === "string" && !!VALID_SORT_MODES[v]; },
         groupEnabled: function (v) { return typeof v === "boolean"; },
-        accentColor:  function (v) { return typeof v === "string" && ["blue","green","purple","red","orange","teal"].indexOf(v) !== -1; },
+        accentColor:  function (v) { return typeof v === "string" && Object.prototype.hasOwnProperty.call(ACCENT_COLORS, v); },
         appearance:   function (v) { return typeof v === "string" && !!APPEARANCE_MODES[v]; },
         autoSort:     function (v) { return typeof v === "boolean"; },
         perLabel:     function (v) { return typeof v === "boolean"; },

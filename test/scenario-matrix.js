@@ -3,7 +3,11 @@ const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 
 const root = require("node:path").join(__dirname, "..");
-const source = fs.readFileSync(require("node:path").join(root, "content.js"), "utf8");
+// Load the content scripts exactly as the manifest lists them, in order.
+const manifest = JSON.parse(fs.readFileSync(require("node:path").join(root, "manifest.json"), "utf8"));
+const source = manifest.content_scripts[0].js
+  .map((file) => fs.readFileSync(require("node:path").join(root, file), "utf8"))
+  .join("\n;\n");
 const styles = fs.readFileSync(require("node:path").join(root, "styles.css"), "utf8");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

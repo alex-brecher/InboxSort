@@ -2,60 +2,20 @@
   "use strict";
 
   /* ================================================================
-   *  InboxSort - Content Script (v1.3.2)
+   *  InboxSort - Content Script (core: state, sorting, UI, observers)
    *  Made by Alex Brecher
    *  Sorts Gmail inbox visually using CSS transforms.
    *  Features: 6 sort modes, group-by-sender toggle, stats bar, filters,
    *  keyboard shortcuts, snooze, per-label prefs, auto-sort toggle.
    * ================================================================ */
 
-  // ── SVG icon library ──────────────────────────────────────────────
-
-  const ICONS = {
-    oldest:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<path d="M8 13V3m-3.5 3.5L8 3l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    newest:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    senderAZ:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<path d="M2 4h4M2 8h7M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-    senderZA:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<path d="M2 4h10M2 8h7M2 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-    unreadFirst:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/>' +
-      '<path d="M2 5l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>' +
-      '<circle cx="12.5" cy="4" r="2" fill="currentColor"/></svg>',
-    groupSender:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<path d="M1 3h14M1 6.5h10M1 10h14M1 13.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
-      '<circle cx="13.5" cy="6.5" r="1.2" fill="currentColor"/>' +
-      '<circle cx="13.5" cy="13.5" r="1.2" fill="currentColor"/></svg>',
-    starred:
-      '<svg viewBox="0 0 16 16" width="13" height="13" fill="none">' +
-      '<path d="M8 1.5l1.76 3.57 3.94.57-2.85 2.78.67 3.93L8 10.67l-3.52 1.68.67-3.93L2.3 5.64l3.94-.57L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-    attachment:
-      '<svg viewBox="0 0 16 16" width="13" height="13" fill="none">' +
-      '<path d="M13.5 7.25l-5.75 5.75a3.18 3.18 0 01-4.5-4.5L9.5 2.25a2.12 2.12 0 013 3L6.25 11.5a1.06 1.06 0 01-1.5-1.5L10.5 4.25" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    search:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<circle cx="6.5" cy="6.5" r="4" stroke="currentColor" stroke-width="1.4"/>' +
-      '<path d="M10 10l4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
-    close:
-      '<svg viewBox="0 0 16 16" width="12" height="12" fill="none">' +
-      '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
-    keyboard:
-      '<svg viewBox="0 0 16 16" width="14" height="14" fill="none">' +
-      '<rect x="1" y="4" width="14" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/>' +
-      '<path d="M4 6.5h1M7 6.5h2M11 6.5h1M5 9h6" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>',
-    selectAll:
-      '<svg viewBox="0 0 14 14" width="11" height="11" fill="none">' +
-      '<rect x="1.5" y="1.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/>' +
-      '<path d="M4 7l2 2 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-  };
+  // Modules loaded before this file (see manifest content_scripts).
+  const {
+    ICONS, ACCENT_COLORS, DARK_ACCENT_COLORS, normalizeHiddenTabs, normalizeAppearance,
+    getCurrentLabel, isListView, isSearchView, stripGmailOverlayParams,
+    getDateFromRow, getSenderFromRow, isUnread, isRowStarred, isRowHasAttachment,
+    getComparator, wrapWithGroupSort
+  } = globalThis.InboxSort;
 
   // ── Sort-mode definitions ─────────────────────────────────────────
 
@@ -79,21 +39,6 @@
     return isKnownSortMode(mode) ? mode : "newest";
   }
 
-  function normalizeHiddenTabs(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-    let normalized = {};
-    let allowed = ["date", "sender", "unread", "starred", "groupSender"];
-    for (let i = 0; i < allowed.length; i++) {
-      if (value[allowed[i]] === true) normalized[allowed[i]] = true;
-    }
-    // Migrate the pre-1.3 per-mode preferences to the merged toolbar controls.
-    if (value.oldest === true && value.newest === true) normalized.date = true;
-    if (value.senderAZ === true && value.senderZA === true) normalized.sender = true;
-    if (value.unreadFirst === true) normalized.unread = true;
-    if (value.starredFirst === true) normalized.starred = true;
-    return normalized;
-  }
-
   // Tab groups: merge related sort modes into single toggle buttons.
   // "newest" (default Gmail order) is NOT in any group — it's the inactive state.
   // Click cycle: inactive → mode[0] → mode[1] → … → inactive (newest).
@@ -104,27 +49,6 @@
     { id: "unread", modes: ["unreadFirst"],             defaultLabel: "Unread", defaultIcon: "unreadFirst" },
     { id: "starred", modes: ["starredFirst"],           defaultLabel: "Starred", defaultIcon: "starred" }
   ];
-
-  // ── Accent colour palette ──────────────────────────────────────────
-
-  const ACCENT_COLORS = {
-    blue:   { primary: "#1a73e8", hover: "#1765cc", ink: "#174ea6", light: "#d2e3fc" },
-    green:  { primary: "#1e8e3e", hover: "#188038", ink: "#137333", light: "#ceead6" },
-    purple: { primary: "#8430ce", hover: "#7627bb", ink: "#5c16a5", light: "#e8d0fe" },
-    red:    { primary: "#c5221f", hover: "#b31412", ink: "#a50e0e", light: "#f4c7c3" },
-    orange: { primary: "#b85d00", hover: "#a65300", ink: "#8d4900", light: "#fde293" },
-    teal:   { primary: "#007b83", hover: "#006d75", ink: "#005f66", light: "#b2ebf2" }
-  };
-
-  // Dark mode accent variants — softer, higher-contrast colors for dark backgrounds
-  const DARK_ACCENT_COLORS = {
-    blue:   { primary: "#8ab4f8", hover: "#aecbfa", light: "rgba(138,180,248,0.18)" },
-    green:  { primary: "#81c995", hover: "#a8dab5", light: "rgba(129,201,149,0.18)" },
-    purple: { primary: "#c58af9", hover: "#d7aefb", light: "rgba(197,138,249,0.18)" },
-    red:    { primary: "#f28b82", hover: "#f6aea9", light: "rgba(242,139,130,0.18)" },
-    orange: { primary: "#fdd663", hover: "#fde293", light: "rgba(253,214,99,0.18)" },
-    teal:   { primary: "#4ecdc4", hover: "#73d8d0", light: "rgba(78,205,196,0.18)" }
-  };
 
   // ── Timing & threshold constants ────────────────────────────────
   // Centralises all magic numbers for easy tuning and documentation.
@@ -184,11 +108,7 @@
     INIT_TIMEOUT: 30000,                // failsafe: stop waiting after 30s
 
     // Cheat-sheet overlay fade duration (ms)
-    CHEATSHEET_FADE: 200,
-
-    // Thread-ID heuristic: strings ≥ this length that are alphanumeric+dash+underscore
-    // are treated as Gmail thread IDs (triggers single-message view detection)
-    THREAD_ID_MIN_LENGTH: 15
+    CHEATSHEET_FADE: 200
   };
 
   // ── Runtime state ─────────────────────────────────────────────────
@@ -259,45 +179,6 @@
   let _lastResizeWidth     = 0;     // Track viewport width to ignore height-only resizes
   let _initialized         = false; // Prevent duplicate timers and observers
 
-  // ── Current Gmail label ─────────────────────────────────────────
-
-  function getCurrentLabel() {
-    let hash = location.hash;
-    if (!hash || hash === "#" || hash === "#inbox" || /^#inbox\/p\d+$/.test(hash)) return "inbox";
-
-    let cleaned = hash.replace(/^#/, "").replace(/\/p\d+$/, "");
-    if (!cleaned) return "inbox";
-
-    // In thread view hashes (e.g. inbox/<threadId>), normalize to the list label
-    // so per-label prefs don't get stored under transient thread IDs.
-    let parts = cleaned.split("/");
-    let lastPart = parts[parts.length - 1];
-    let threadLikeTail = !!(lastPart &&
-      lastPart.length >= CONFIG.THREAD_ID_MIN_LENGTH &&
-      /^[A-Za-z0-9_-]+$/.test(lastPart));
-
-    // Two-segment hashes are often list labels (e.g. label/Work). Only treat
-    // the last segment as a thread id when the path shape can actually contain
-    // a thread tail for that root.
-    let singleRootThreadLabels = {
-      inbox: true, all: true, sent: true, starred: true, important: true,
-      drafts: true, snoozed: true, spam: true, trash: true, scheduled: true,
-      chats: true
-    };
-    let canHaveThreadTail =
-      (parts.length >= 3) ||
-      (parts.length >= 2 && !!singleRootThreadLabels[parts[0]]);
-
-    if (threadLikeTail && canHaveThreadTail) {
-      parts.pop();
-    }
-
-    let normalized = parts.join("/");
-    return normalized || "inbox";
-  }
-
-  // Labels where the toolbar is hidden — these folders contain too many
-  // emails for client-side sorting to work well.
   let EXCLUDED_LABELS = { "sent": true, "all": true };
 
   function isExcludedLabel() {
@@ -800,12 +681,6 @@
   // class on <html> plus a class on each InboxSort element, and the accent
   // CSS variables switch with it, so group tints follow automatically.
 
-  const APPEARANCE_MODES = { system: true, light: true, dark: true };
-
-  function normalizeAppearance(mode) {
-    return APPEARANCE_MODES[mode] ? mode : "system";
-  }
-
   let _darkQuery = null;
   try {
     _darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
@@ -846,143 +721,6 @@
     root.setProperty("--sort-accent-hover", use.hover);
     root.setProperty("--sort-accent-light", use.light || c.light);
     root.setProperty("--sort-accent-ink", isDarkMode ? use.primary : c.ink);
-  }
-
-  // ── Date parsing ──────────────────────────────────────────────────
-
-  function parseGmailDate(text) {
-    if (!text) return null;
-    let cleaned = text.replace(/\u200e/g, "").trim();
-    let d = new Date(cleaned);
-    if (!isNaN(d.getTime())) return d;
-
-    let monthDay = cleaned.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})$/i);
-    if (monthDay) {
-      let year = new Date().getFullYear();
-      d = new Date(monthDay[1] + " " + monthDay[2] + ", " + year);
-      // If parsed date is in the future, it's likely from last year
-      if (!isNaN(d.getTime()) && d > new Date()) {
-        d = new Date(monthDay[1] + " " + monthDay[2] + ", " + (year - 1));
-      }
-      if (!isNaN(d.getTime())) return d;
-    }
-
-    let timeOnly = cleaned.match(/^\d{1,2}:\d{2}\s*(AM|PM)$/i);
-    if (timeOnly) {
-      d = new Date(new Date().toDateString() + " " + cleaned);
-      if (!isNaN(d.getTime())) return d;
-    }
-
-    let time24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
-    if (time24) {
-      let hours = parseInt(time24[1], 10);
-      let minutes = parseInt(time24[2], 10);
-      if (hours <= 23 && minutes <= 59) {
-        d = new Date();
-        d.setHours(hours, minutes, 0, 0);
-        return d;
-      }
-    }
-    return null;
-  }
-
-  // ── Row-data extractors ───────────────────────────────────────────
-
-  function getDateFromRow(row) {
-    let spans = row.querySelectorAll("td span[title]");
-    for (let i = 0; i < spans.length; i++) {
-      let d = parseGmailDate(spans[i].getAttribute("title"));
-      if (d) return d;
-    }
-    return null;
-  }
-
-  function getSenderFromRow(row) {
-    // Gmail uses .bA4 for the complete visible sender or participant label.
-    // Its nested .zF and .yP elements can represent only one participant.
-    let el = row.querySelector("span.bA4") ||
-             row.querySelector("span.zF") ||
-             row.querySelector("span.yP") ||
-             row.querySelector("[data-hovercard-id]");
-    if (!el) return "";
-    let sender = (el.getAttribute("name") || el.textContent || el.getAttribute("data-hovercard-id") || "").trim();
-    return sender.toLocaleLowerCase();
-  }
-
-  function isUnread(row) {
-    return !!(row && row.classList && row.classList.contains("zE"));
-  }
-
-  // ── Starred-row detection ─────────────────────────────────────────
-
-  function isRowStarred(row) {
-    try {
-      // Fast-path: the standard Gmail starred class
-      if (row.querySelector("td.apU span.T-KT-Jp")) return true;
-
-      // PERF: Single query for the star cell, then walk its subtree once
-      let starCell = row.querySelector("td.apU");
-      if (!starCell) return false;
-
-      // Check for T-KT subclasses (indicates active star state)
-      let starSpans = starCell.getElementsByClassName("T-KT");
-      for (let k = 0; k < starSpans.length; k++) {
-        let cl = starSpans[k].classList;
-        for (let m = 0; m < cl.length; m++) {
-          if (cl[m] !== "T-KT" && cl[m].indexOf("T-KT-") === 0) return true;
-        }
-      }
-
-      // Check aria-label / title on elements within the star cell
-      // Supports English ("starred"/"not starred") and uses data attribute
-      // as a locale-agnostic fallback for non-English Gmail
-      let allEls = starCell.querySelectorAll("[aria-label], [title], [data-tooltip]");
-      for (let i = 0; i < allEls.length; i++) {
-        let lbl = (allEls[i].getAttribute("aria-label") || allEls[i].getAttribute("title") || allEls[i].getAttribute("data-tooltip") || "").toLowerCase();
-        if (lbl === "starred") return true;
-        if (lbl.indexOf("starred") !== -1 && lbl.indexOf("not") === -1) return true;
-      }
-
-      // Locale-agnostic fallback: check if the star cell's img/icon has a
-      // "checked" or "active" state via ARIA or class naming conventions
-      let ariaChecked = starCell.querySelector("[aria-checked='true'], [data-starred='true']");
-      if (ariaChecked) return true;
-
-      // Check SVG fills (some themes use SVG stars)
-      let svgs = starCell.getElementsByTagName("svg");
-      for (let n = 0; n < svgs.length; n++) {
-        let paths = svgs[n].querySelectorAll("path, polygon");
-        for (let p = 0; p < paths.length; p++) {
-          let fill = paths[p].getAttribute("fill");
-          if (fill && fill !== "none" && fill !== "transparent" && fill !== "currentColor") return true;
-        }
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // ── Attachment-row detection ──────────────────────────────────────
-
-  function isRowHasAttachment(row) {
-    try {
-      // PERF: Cheapest class-based checks first (most common Gmail versions)
-      if (row.querySelector("span.brg, div.brd, span.aZo, span.boo, img.br2")) return true;
-      if (row.querySelector("td.yf img.yE")) return true;
-
-      // Narrower attribute checks only if class checks failed
-      let tooltipEls = row.querySelectorAll("[data-tooltip]");
-      for (let j = 0; j < tooltipEls.length; j++) {
-        if ((tooltipEls[j].getAttribute("data-tooltip") || "").toLowerCase().indexOf("attachment") !== -1) return true;
-      }
-
-      // Fallback: scoped alt check (cheaper than broad [aria-label],[title])
-      if (row.querySelector('img[alt="Has attachment"]')) return true;
-      return false;
-    } catch (e) {
-      return false;
-    }
   }
 
   // ── Visible email rows (cached for perf) ──────────────────────────
@@ -1065,71 +803,6 @@
       meta.starred = isRowStarred(row);
     }
     return meta;
-  }
-
-  // ── Sort comparators ──────────────────────────────────────────────
-  // O(1) lookup table mapping sort-mode IDs to comparator functions.
-  // Each comparator returns a standard <0 / 0 / >0 sort value.
-  // Rows with missing dates are pushed to the bottom of the list.
-
-  const SORT_MODE_MAP = {
-    oldest: function (a, b) {
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return a.date.getTime() - b.date.getTime();
-    },
-    newest: function (a, b) {
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return b.date.getTime() - a.date.getTime();
-    },
-    senderAZ: function (a, b) {
-      if (!a.sender && !b.sender) return 0;
-      if (!a.sender) return 1;
-      if (!b.sender) return -1;
-      return a.sender.localeCompare(b.sender);
-    },
-    senderZA: function (a, b) {
-      if (!a.sender && !b.sender) return 0;
-      if (!a.sender) return 1;
-      if (!b.sender) return -1;
-      return b.sender.localeCompare(a.sender);
-    },
-    unreadFirst: function (a, b) {
-      if (a.unread !== b.unread) return a.unread ? -1 : 1;
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return b.date.getTime() - a.date.getTime();
-    },
-    starredFirst: function (a, b) {
-      if (a.starred !== b.starred) return a.starred ? -1 : 1;
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return b.date.getTime() - a.date.getTime();
-    }
-  };
-
-  function getComparator(mode) {
-    return SORT_MODE_MAP[mode] || function () { return 0; };
-  }
-
-  // Wraps any comparator with a group-by-sender primary sort.
-  // Within each sender group, the inner comparator determines order.
-  // reverseGroups: when true, groups are sorted Z→A (used for senderZA mode).
-  function wrapWithGroupSort(innerComparator, reverseGroups) {
-    return function (a, b) {
-      if (!a.sender && !b.sender) return innerComparator(a, b);
-      if (!a.sender) return 1;
-      if (!b.sender) return -1;
-      let cmp = a.sender.localeCompare(b.sender);
-      if (reverseGroups) cmp = -cmp;
-      if (cmp !== 0) return cmp;
-      return innerComparator(a, b);
-    };
   }
 
   // ── CSS-transform sorting ─────────────────────────────────────────
@@ -2025,69 +1698,6 @@
     }, CONFIG.TOAST_DISPLAY);
   }
 
-  // ── View detection ────────────────────────────────────────────────
-
-  /**
-   * isListView — Determines whether the current Gmail view is a message list
-   * (inbox, label, category) vs. a single-message/thread view.
-   *
-   * Gmail encodes normal thread IDs in the URL hash as the last path segment.
-   * Messages opened in their own window use a `/popout` route (or an older
-   * query-string message view) and must also be treated as thread views.
-   * Thread IDs are long (≥15 chars), Base64-ish strings (alphanumeric + dash + underscore).
-   * Examples:  #inbox/FMfcgzQXKhbfGqQlChrCxfZVSvxBpmJB   ← thread view
-   *            #inbox/p2                                   ← list view, page 2
-   *            #label/Work                                 ← list view
-   *
-   * Heuristic: if the last hash segment is ≥ THREAD_ID_MIN_LENGTH characters
-   * and matches [A-Za-z0-9_-]+, treat it as a thread ID → not a list view.
-   * This avoids false positives from short label names, pagination tokens, etc.
-   */
-  function isListView() {
-    // Gmail's "Open in new window" route does not use the normal hash-based
-    // thread URL. Current Gmail uses /popout; older/alternate message-only
-    // routes use view=btop, view=pt, or view=om.
-    if (/\/popout\/?$/.test(location.pathname)) return false;
-
-    let standaloneView = "";
-    try {
-      standaloneView = new URLSearchParams(location.search).get("view") || "";
-    } catch (_) { /* fall through to hash detection */ }
-    if (standaloneView === "btop" || standaloneView === "pt" || standaloneView === "om") {
-      return false;
-    }
-
-    let hash = location.hash;
-    if (hash === "" || hash === "#" || hash === "#inbox") return true;
-    if (/^#inbox\/p\d+$/.test(hash)) return true;
-    let parts = hash.replace(/^#/, "").split("/");
-    let lastPart = parts[parts.length - 1];
-    if (/^p\d+$/.test(lastPart)) return true;
-
-    let threadLikeTail = !!(lastPart &&
-      lastPart.length >= CONFIG.THREAD_ID_MIN_LENGTH &&
-      /^[A-Za-z0-9_-]+$/.test(lastPart));
-    if (!threadLikeTail) return true;
-
-    // Two-segment hashes like "label/Work" are often list labels, not threads.
-    // Restrict thread detection to roots that can contain direct thread tails.
-    let singleRootThreadLabels = {
-      inbox: true, all: true, sent: true, starred: true, important: true,
-      drafts: true, snoozed: true, spam: true, trash: true, scheduled: true,
-      chats: true
-    };
-    let canHaveThreadTail =
-      (parts.length >= 3) ||
-      (parts.length >= 2 && !!singleRootThreadLabels[parts[0]]);
-    if (canHaveThreadTail) return false;
-
-    return true;
-  }
-
-  function isSearchView() {
-    return /^#search\//.test(location.hash);
-  }
-
   // ── Button injection & visibility ─────────────────────────────────
 
   function isButtonInjected() {
@@ -2736,13 +2346,6 @@
         updateButtonVisibility();
       }
     }, CONFIG.OBSERVER_WATCHDOG);
-  }
-
-  // Strip Gmail overlay params (compose, reply, forward, etc.) so
-  // opening/closing Compose doesn't trigger a full sort reset.
-  function stripGmailOverlayParams(url) {
-    return url.replace(/[\?&](compose|view|tf|fs|to|su|body|source|sz|simpl|rm|ms|search|th|cvid|qs|cs)=[^&]*/g, "")
-              .replace(/[?&]$/, "");
   }
 
   // Row-change detection: re-sort when rows change (archive, delete, new mail)

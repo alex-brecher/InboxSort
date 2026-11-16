@@ -5,7 +5,8 @@ const { JSDOM } = require("jsdom");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "popup.html"), "utf8");
-const source = fs.readFileSync(path.join(root, "popup.js"), "utf8");
+const source = fs.readFileSync(path.join(root, "shared.js"), "utf8") + "\n;\n" +
+  fs.readFileSync(path.join(root, "popup.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "popup.css"), "utf8");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
