@@ -178,6 +178,7 @@
   let _resizeDebounce      = null;  // Debounce timer for viewport resize re-sort
   let _lastResizeWidth     = 0;     // Track viewport width to ignore height-only resizes
   let _initialized         = false; // Prevent duplicate timers and observers
+  let _visualOrder         = null;  // Rows in on-screen order after the last sort
   let _selectAnchorRow     = null;  // Last plain-clicked row, for visual shift-click ranges
   let _programmaticCheckboxClick = false; // our own range / bulk clicks keep the anchor
 
@@ -195,10 +196,9 @@
   function isExtensionContextValid() {
     if (_contextInvalid) return false;
     try {
-      // chrome.runtime.id is undefined when the extension has been
-      // reloaded / uninstalled while this content-script is still alive.
-      void chrome.runtime.id;
-      return true;
+      // chrome.runtime.id becomes undefined (without throwing) once the
+      // extension is updated, reloaded or removed while this script lives on.
+      return !!(chrome.runtime && chrome.runtime.id);
     } catch (e) {
       return false;
     }
@@ -274,6 +274,10 @@
     if (typeof console !== "undefined" && typeof console.debug === "function") {
       console.debug("[InboxSort] Extension context invalidated — cleaning up.");
     }
+    // Put Gmail back to its own order first: a sorted or dimmed list with no
+    // InboxSort guards left would make shift-click and archive act on the
+    // wrong rows (the new version injects only after a reload).
+    try { clearFilters(); clearSortTransforms(); } catch (_) { /* best effort */ }
 
     // Stop timers/intervals to avoid stale loops after extension reload/uninstall.
     if (autoSortInterval)    { clearInterval(autoSortInterval);    autoSortInterval = null; }
@@ -299,9 +303,9 @@
     if (_observer) { _observer.disconnect(); _observer = null; }
     _observerRoot = null;
     document.removeEventListener("click", onDocumentClick, true);
-    document.removeEventListener("mousedown", onCheckboxPointer, true);
-    document.removeEventListener("mouseup", onCheckboxPointer, true);
-    document.removeEventListener("click", onCheckboxPointer, true);
+    window.removeEventListener("mousedown", onCheckboxPointer, true);
+    window.removeEventListener("mouseup", onCheckboxPointer, true);
+    window.removeEventListener("click", onCheckboxPointer, true);
     document.removeEventListener("click", rememberSelectAnchor, true);
     document.removeEventListener("mousedown", onDocumentMousedown, true);
     document.removeEventListener("input", onDocumentInput, false);
@@ -638,15 +642,21 @@
       }
     }
 
+    // A change from another tab re-sorts this list too, except search results
+    // the user has not sorted here (they keep Google's relevance order).
+    function canFollowOtherTab() {
+      return container && isListView() && !isExcludedLabel() && !isSnoozedActive() &&
+        (!isSearchView() || hasSortTransforms());
+    }
     if (changes.perLabel) {
       loadState(function () {
-        if (container && isListView() && !isExcludedLabel() && !isSnoozedActive()) {
+        if (canFollowOtherTab()) {
           applySort(currentSort, true);
         } else {
           refreshUI();
         }
       });
-    } else if (sortStateChanged && container && isListView() && !isExcludedLabel() && !isSnoozedActive()) {
+    } else if (sortStateChanged && canFollowOtherTab()) {
       applySort(currentSort, true);
     }
   });
@@ -841,72 +851,69 @@
     if (groupEnabled) {
       comparator = wrapWithGroupSort(comparator, mode === "senderZA");
     }
-    let sorted = items.slice().sort(comparator);
 
-    // Compute base transforms using cumulative positioning.
-    // The old formula (items[i].origTop - sorted[i].origTop) assumed all rows
-    // have identical height. When row heights differ (Gmail snippets, labels,
-    // density), it creates gaps between rows. Instead, stack each sorted row
-    // directly after the previous one based on actual heights.
-    let transforms = new Array(sorted.length);
-    let targetTop = items[0].origTop; // Start at the top of the first DOM row
-    for (let i = 0; i < sorted.length; i++) {
-      transforms[i] = targetTop - sorted[i].origTop;
-      targetTop += sorted[i].height; // Next position based on THIS row's actual height
+    // Gmail layouts with sections (Priority Inbox, Important/Unread/Starred
+    // first, Multiple Inboxes) render each section as its own table, and
+    // offsetTop is measured from that table. Sort each table on its own so
+    // rows never move across sections or overlap.
+    let sections = [];
+    let sectionByTable = new Map();
+    for (let si = 0; si < items.length; si++) {
+      let table = items[si].row.closest("table");
+      let section = sectionByTable.get(table);
+      if (!section) {
+        section = [];
+        sectionByTable.set(table, section);
+        sections.push(section);
+      }
+      section.push(items[si]);
     }
 
-    // Group visuals: compute group metadata when groupEnabled
-    let groupData = null;
-    if (groupEnabled) {
-      // Count emails per sender for badge numbers
-      let senderCounts = {};
-      for (let sc = 0; sc < sorted.length; sc++) {
-        let sk = sorted[sc].sender || "";
-        senderCounts[sk] = (senderCounts[sk] || 0) + 1;
+    let sorted = [];
+    let transforms = [];
+    let perRow = groupEnabled ? [] : null;
+    for (let sx = 0; sx < sections.length; sx++) {
+      let sectionItems = sections[sx];
+      let sectionSorted = sectionItems.slice().sort(comparator);
+
+      // Stack each sorted row directly after the previous one using real
+      // heights (rows differ with snippets, labels and density).
+      let targetTop = sectionItems[0].origTop;
+      for (let i = 0; i < sectionSorted.length; i++) {
+        sorted.push(sectionSorted[i]);
+        transforms.push(targetTop - sectionSorted[i].origTop);
+        targetTop += sectionSorted[i].height;
       }
 
-      // Compute per-row group info
-      let prevSender = "";
-      let groupIndex = -1;
-      let isFirstGroup = true;
-      let perRow = new Array(sorted.length);
-      for (let g = 0; g < sorted.length; g++) {
-        let senderKey = sorted[g].sender || "";
-        if (senderKey !== prevSender) {
-          groupIndex++;
-          perRow[g] = {
-            isEven: (groupIndex % 2 === 1),
-            isGroupStart: true,
-            isVeryFirst: isFirstGroup,
-            badgeNum: senderCounts[senderKey] || 1,
-            senderKey: senderKey
-          };
-          isFirstGroup = false;
-        } else {
-          perRow[g] = {
-            isEven: (groupIndex % 2 === 1),
-            isGroupStart: false,
-            isVeryFirst: false,
-            badgeNum: 0,
-            senderKey: senderKey
-          };
+      if (perRow) {
+        let senderCounts = {};
+        for (let sc = 0; sc < sectionSorted.length; sc++) {
+          let sk = sectionSorted[sc].sender || "";
+          senderCounts[sk] = (senderCounts[sk] || 0) + 1;
         }
-        prevSender = senderKey;
+        let prevSender = null;
+        let groupIndex = -1;
+        for (let g = 0; g < sectionSorted.length; g++) {
+          let senderKey = sectionSorted[g].sender || "";
+          let isStart = senderKey !== prevSender;
+          if (isStart) groupIndex++;
+          perRow.push({
+            isEven: (groupIndex % 2 === 1),
+            isGroupStart: isStart,
+            isVeryFirst: isStart && groupIndex === 0,
+            badgeNum: isStart ? (senderCounts[senderKey] || 1) : 0,
+            senderKey: senderKey
+          });
+          prevSender = senderKey;
+        }
       }
-      groupData = { perRow: perRow, totalGroups: groupIndex + 1 };
     }
 
-    // Apply group styling and transforms SYNCHRONOUSLY.
-    // Previous approach deferred to rAF, which could fail if Gmail's
-    // MutationObserver replaced row elements between schedule and callback.
-    // Since reading offsetTop/offsetHeight above already forced a reflow
-    // (committing the cleared state), we can safely set transitions +
-    // transforms here and the browser will animate from the committed
-    // "cleared" positions.
+    // Apply group styling and transforms synchronously: reading offsetTop
+    // above already forced a reflow, so the browser animates from the
+    // committed positions, and Gmail cannot swap rows in between.
     try {
-      if (groupData) {
-        applyGroupVisuals(sorted, groupData);
-      }
+      if (perRow) applyGroupVisuals(sorted, { perRow: perRow });
     } catch (groupErr) {
       console.warn("[InboxSort] Group styling error:", groupErr);
     }
@@ -925,6 +932,8 @@
       el.style.transform = "translateY(" + transforms[j] + "px)";
     }
 
+    // Final visual order, known without waiting for the animation to finish.
+    _visualOrder = sorted.map(function (it) { return it.row; });
     _lastSortedRowCount = rows.length;
     _lastSortedRowElements = rows.slice(); // Full list: Gmail can swap any row element
     return rows.length;
@@ -985,6 +994,7 @@
     _suppressObserver = true;
     try {
       clearGroupBadges();
+      _visualOrder = null;
       let rows = document.querySelectorAll("tr.zA");
       for (let i = 0; i < rows.length; i++) {
         let s = rows[i].style;
@@ -1499,6 +1509,7 @@
 
       let oldPag = getCurrentPaginationText();
       let baseHash = location.hash.replace(/\/p\d+$/, "");
+      if (!baseHash || baseHash === "#") baseHash = "#inbox";
       location.hash = baseHash + "/p" + lastPage;
 
       waitForNewPage(oldPag, function (loaded) {
@@ -1558,8 +1569,16 @@
   }
 
   function toggleGroup() {
-    // Manual group changes should end snooze immediately.
-    if (isSnoozedActive()) cancelSnooze(false);
+    // Manual group changes end a pause. Restore the saved sort and group
+    // first so the toggle starts from the user's real state and the saved
+    // sort is not overwritten with the paused default.
+    if (isSnoozedActive()) {
+      let sortBeforePause = snoozedSort || "newest";
+      let groupBeforePause = !!snoozedGroup;
+      cancelSnooze(false);
+      currentSort = normalizeSortMode(sortBeforePause);
+      groupEnabled = groupBeforePause;
+    }
     groupEnabled = !groupEnabled;
     saveState();
     _suppressObserver = true;
@@ -1726,8 +1745,11 @@
   function updateButtonVisibility() {
     if (!container) return;
     let visible = isListView() && !isExcludedLabel();
+    let wasHidden = container.classList.contains("gmail-sort-hidden");
     container.classList.toggle("gmail-sort-hidden", !visible);
-    if (!visible) clearFilters();
+    // Runs every watchdog tick; only touch rows when something changes.
+    let anyFilter = !!(searchQuery || filterStarred || filterAttachment || filterUnread);
+    if (!visible && (!wasHidden || anyFilter)) clearFilters();
   }
 
   function applyHiddenTabs() {
@@ -1902,8 +1924,14 @@
   // is active, InboxSort selects the range the user actually sees instead.
 
 
+  // True when rows are currently moved on screen, whatever the bookkeeping
+  // says (the row cache is reset on navigation while transforms remain).
+  function hasSortTransforms() {
+    return _lastSortedRowCount > 0 || !!document.querySelector('tr.zA[style*="translateY"]');
+  }
+
   function isSortVisuallyActive() {
-    return !isSnoozedActive() && (currentSort !== "newest" || groupEnabled) && _lastSortedRowCount > 0;
+    return hasSortTransforms();
   }
 
   function getRowCheckbox(row) {
@@ -1917,12 +1945,23 @@
 
   function getRowsInVisualOrder() {
     let rows = getVisibleEmailRows(true);
-    let items = new Array(rows.length);
-    for (let i = 0; i < rows.length; i++) {
-      items[i] = { row: rows[i], top: rows[i].getBoundingClientRect().top };
+    let ordered = null;
+    // Prefer the order computed by the last sort: it is final even while the
+    // rows are still animating. Fall back to on-screen positions.
+    if (_visualOrder && _visualOrder.length === rows.length) {
+      let known = new Set(_visualOrder);
+      if (rows.every(function (r) { return known.has(r); })) ordered = _visualOrder.slice();
     }
-    items.sort(function (a, b) { return a.top - b.top; });
-    return items.map(function (it) { return it.row; });
+    if (!ordered) {
+      let items = new Array(rows.length);
+      for (let i = 0; i < rows.length; i++) {
+        items[i] = { row: rows[i], top: rows[i].getBoundingClientRect().top };
+      }
+      items.sort(function (a, b) { return a.top - b.top; });
+      ordered = items.map(function (it) { return it.row; });
+    }
+    // Rows hidden by a filter are faded and unclickable; never select them.
+    return ordered.filter(function (r) { return !r.classList.contains("gmail-sort-dim"); });
   }
 
   function checkboxRowFromEvent(e) {
@@ -2094,9 +2133,9 @@
     }
   }
   document.addEventListener("click", onDocumentClick, true);
-  document.addEventListener("mousedown", onCheckboxPointer, true);
-  document.addEventListener("mouseup", onCheckboxPointer, true);
-  document.addEventListener("click", onCheckboxPointer, true);
+  window.addEventListener("mousedown", onCheckboxPointer, true);
+  window.addEventListener("mouseup", onCheckboxPointer, true);
+  window.addEventListener("click", onCheckboxPointer, true);
   document.addEventListener("click", rememberSelectAnchor, true);
 
   function onDocumentMousedown(e) {
@@ -2221,6 +2260,7 @@
         case "Digit7": applySort("starredFirst", false); break;
         case "Slash": toggleCheatSheet(); break;
         case "Digit0":
+          if (isSnoozedActive()) cancelSnooze(false);
           clearFilters();
           groupEnabled = false;
           clearSortTransforms();
@@ -2242,15 +2282,27 @@
 
   // ── Auto-sort on page load ────────────────────────────────────────
 
+  // A navigation where no re-sort will run: rows still carrying transforms
+  // from the previous view would look sorted but behave unsorted.
+  function settleWithoutSort() {
+    if (hasSortTransforms()) {
+      let wasSuppressed = _suppressObserver;
+      _suppressObserver = true;
+      try { clearSortTransforms(); } finally { queueMicrotask(function () { _suppressObserver = wasSuppressed; }); }
+    }
+    refreshUI();
+  }
+
   // force=true on initial page load — always restore stored sort.
   // force=false on DOM rebuilds — respect autoSort toggle.
   function autoSortWhenReady(force) {
+    // Mutex: a run is already in flight (its poll is still going); let it
+    // finish. Checked before touching the poll so the lock cannot get stuck.
+    if (_autoSortPending && !force) return;
     if (autoSortInterval) {
       clearInterval(autoSortInterval);
       autoSortInterval = null;
     }
-    // Mutex: prevent duplicate calls from rapid MutationObserver firings
-    if (_autoSortPending && !force) return;
     // While snoozed, keep inbox in default order regardless of stored sort.
     if (isSnoozedActive()) {
       currentSort = "newest";
@@ -2274,14 +2326,14 @@
       // Never auto-sort on excluded labels (Sent, All Mail) — too many emails
       if (isExcludedLabel()) {
         _autoSortPending = false;
-        refreshUI();
+        settleWithoutSort();
         return;
       }
 
       // Always skip if mode is already "newest" with no grouping (nothing to do)
       if (currentSort === "newest" && !groupEnabled) {
         _autoSortPending = false;
-        refreshUI();
+        settleWithoutSort();
         return;
       }
 
@@ -2289,14 +2341,14 @@
       // relevance ranking.  Users can still manually sort/group via the toolbar.
       if (isSearchView()) {
         _autoSortPending = false;
-        refreshUI();
+        settleWithoutSort();
         return;
       }
 
       // On DOM rebuilds (not initial load), respect the autoSort toggle
       if (!force && !autoSortEnabled) {
         _autoSortPending = false;
-        refreshUI();
+        settleWithoutSort();
         return;
       }
 
@@ -2382,7 +2434,7 @@
   let _rowChangeTimer = null;
 
   function resortIfRowsChanged() {
-    if (_contextInvalid || isSnoozedActive() || _lastSortedRowCount === 0) return;
+    if (_contextInvalid || isSnoozedActive() || !hasSortTransforms()) return;
     if (currentSort === "newest" && !groupEnabled) return;
     let elapsed = Date.now() - _lastRowChangeSort;
     if (elapsed < CONFIG.ROW_CHANGE_THROTTLE) {
@@ -2661,9 +2713,9 @@
       _hiddenTabsRetryTimers = [];
     }
     document.removeEventListener("click", onDocumentClick, true);
-    document.removeEventListener("mousedown", onCheckboxPointer, true);
-    document.removeEventListener("mouseup", onCheckboxPointer, true);
-    document.removeEventListener("click", onCheckboxPointer, true);
+    window.removeEventListener("mousedown", onCheckboxPointer, true);
+    window.removeEventListener("mouseup", onCheckboxPointer, true);
+    window.removeEventListener("click", onCheckboxPointer, true);
     document.removeEventListener("click", rememberSelectAnchor, true);
     document.removeEventListener("mousedown", onDocumentMousedown, true);
     document.removeEventListener("input", onDocumentInput, false);
@@ -2681,8 +2733,10 @@
 
   window.addEventListener("resize", function () {
     if (_contextInvalid) return;
-    // Only re-sort if transforms are actively applied
+    // Only re-sort if rows are actually moved (never sorts search results or
+    // any view the user left unsorted).
     if (currentSort === "newest" && !groupEnabled) return;
+    if (!hasSortTransforms()) return;
 
     let w = window.innerWidth;
     // Ignore height-only changes and trivial width jitter (< 10px)
