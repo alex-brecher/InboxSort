@@ -7,7 +7,7 @@ module.exports = [
     ignores: ["node_modules/**", "store-assets/**", "store-listing/**"]
   },
   {
-    files: ["shared.js", "content*.js", "popup.js", "theme-boot.js"],
+    files: ["shared.js", "content*.js", "popup.js", "theme-boot.js", "test/visual/**/*.js"],
     languageOptions: { ecmaVersion: 2022, sourceType: "script", globals: extensionGlobals },
     rules: {
       "no-undef": "error",
@@ -23,7 +23,7 @@ module.exports = [
     }
   },
   {
-    files: ["test/**/*.js", "eslint.config.js"],
+    files: ["test/*.js", "eslint.config.js"],
     languageOptions: { ecmaVersion: 2022, sourceType: "commonjs", globals: { ...globals.node } },
     rules: { "no-undef": "error", "no-unused-vars": ["error", { args: "none" }] }
   }
